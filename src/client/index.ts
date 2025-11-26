@@ -32,7 +32,7 @@ export class Loops {
 	public readonly options?: {
 		apiKey?: string;
 	};
-	
+
 	constructor(
 		component: LoopsComponent,
 		options?: {
@@ -43,26 +43,26 @@ export class Loops {
 			throw new Error(
 				"Loops component reference is required. " +
 					"Make sure the component is mounted in your convex.config.ts and use: " +
-					"new Loops(components.loops)"
+					"new Loops(components.loops)",
 			);
 		}
-		
+
 		if (!component.lib) {
 			throw new Error(
 				"Invalid component reference. " +
 					"The component may not be properly mounted. " +
 					"Ensure the component is correctly mounted in convex.config.ts: " +
-					"app.use(loops);"
+					"app.use(loops);",
 			);
 		}
-		
+
 		this.component = component;
 		this.options = options;
-		
+
 		const apiKey = options?.apiKey ?? process.env.LOOPS_API_KEY;
 		if (!apiKey) {
 			throw new Error(
-				"Loops API key is required. Set LOOPS_API_KEY in your Convex environment variables."
+				"Loops API key is required. Set LOOPS_API_KEY in your Convex environment variables.",
 			);
 		}
 
@@ -87,7 +87,7 @@ export class Loops {
 			throw new Error(
 				"Loops component is not initialized. " +
 					"Make sure to pass components.loops to the Loops constructor: " +
-					"new Loops(components.loops)"
+					"new Loops(components.loops)",
 			);
 		}
 		if (!this.component.lib) {
@@ -95,7 +95,7 @@ export class Loops {
 				"Invalid component reference. " +
 					"The component may not be properly mounted. " +
 					"Ensure the component is correctly mounted in convex.config.ts: " +
-					"app.use(loops);"
+					"app.use(loops);",
 			);
 		}
 		return ctx.runAction((this.component.lib as any).addContact, {
@@ -124,7 +124,10 @@ export class Loops {
 	/**
 	 * Send a transactional email using a transactional ID
 	 */
-	async sendTransactional(ctx: RunActionCtx, options: TransactionalEmailOptions) {
+	async sendTransactional(
+		ctx: RunActionCtx,
+		options: TransactionalEmailOptions,
+	) {
 		return ctx.runAction((this.component.lib as any).sendTransactional, {
 			apiKey: this.apiKey,
 			...options,
@@ -198,7 +201,10 @@ export class Loops {
 			subscribed?: boolean;
 		},
 	) {
-		return ctx.runQuery((this.component.lib as any).countContacts, options ?? {});
+		return ctx.runQuery(
+			(this.component.lib as any).countContacts,
+			options ?? {},
+		);
 	}
 
 	/**
@@ -298,7 +304,10 @@ export class Loops {
 			maxEmails: number;
 		},
 	) {
-		return ctx.runQuery((this.component.lib as any).checkRecipientRateLimit, options);
+		return ctx.runQuery(
+			(this.component.lib as any).checkRecipientRateLimit,
+			options,
+		);
 	}
 
 	/**
@@ -312,7 +321,10 @@ export class Loops {
 			maxEmails: number;
 		},
 	) {
-		return ctx.runQuery((this.component.lib as any).checkActorRateLimit, options);
+		return ctx.runQuery(
+			(this.component.lib as any).checkActorRateLimit,
+			options,
+		);
 	}
 
 	/**
@@ -325,7 +337,10 @@ export class Loops {
 			maxEmails: number;
 		},
 	) {
-		return ctx.runQuery((this.component.lib as any).checkGlobalRateLimit, options);
+		return ctx.runQuery(
+			(this.component.lib as any).checkGlobalRateLimit,
+			options,
+		);
 	}
 
 	/**
@@ -341,11 +356,11 @@ export class Loops {
 	/**
 	 * Trigger a loop for a contact
 	 * Loops are automated email sequences that can be triggered by events
-	 * 
+	 *
 	 * Note: Loops.so doesn't have a direct loop trigger endpoint.
 	 * Loops are triggered through events. Make sure your loop is configured
 	 * in the Loops dashboard to listen for events.
-	 * 
+	 *
 	 * @param options.eventName - Optional event name. If not provided, uses `loop_{loopId}`
 	 */
 	async triggerLoop(

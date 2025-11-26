@@ -1,13 +1,16 @@
 import { useAction } from "convex/react";
-import { api } from "../convex/_generated/api";
 import { useState } from "react";
+import { api } from "../convex/_generated/api";
 import "./index.css";
 
 export function App() {
 	const [email, setEmail] = useState("");
 	const [firstName, setFirstName] = useState("");
 	const [lastName, setLastName] = useState("");
-	const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+	const [message, setMessage] = useState<{
+		type: "success" | "error";
+		text: string;
+	} | null>(null);
 
 	const addContact = useAction(api.example.addContact);
 	const sendEvent = useAction(api.example.sendEvent);

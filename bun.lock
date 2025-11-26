@@ -4,6 +4,10 @@
   "workspaces": {
     "": {
       "name": "convex-component-template",
+      "dependencies": {
+        "zod": "^4.1.12",
+        "zodvex": "^0.2.3",
+      },
       "devDependencies": {
         "@arethetypeswrong/cli": "^0.18.2",
         "@biomejs/biome": "2.3.0",
@@ -26,8 +30,6 @@
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
         "tailwindcss": "^4.1.16",
-        "zod": "^4.1.12",
-        "zodvex": "^0.2.3",
       },
       "peerDependencies": {
         "convex": "^1.0.0",

@@ -8,7 +8,7 @@ const LOOPS_API_BASE_URL = "https://app.loops.so/api/v1";
 /**
  * Sanitize error messages to avoid leaking sensitive information
  */
-const sanitizeError = (status: number, errorText: string): Error => {
+const sanitizeError = (status: number, _errorText: string): Error => {
 	if (status === 401 || status === 403) {
 		return new Error("Authentication failed. Please check your API key.");
 	}
@@ -120,7 +120,8 @@ export const logEmailOperation = zm({
 		};
 
 		if (args.actorId) operationData.actorId = args.actorId;
-		if (args.transactionalId) operationData.transactionalId = args.transactionalId;
+		if (args.transactionalId)
+			operationData.transactionalId = args.transactionalId;
 		if (args.campaignId) operationData.campaignId = args.campaignId;
 		if (args.loopId) operationData.loopId = args.loopId;
 		if (args.eventName) operationData.eventName = args.eventName;
@@ -143,7 +144,7 @@ export const countContacts = zq({
 	}),
 	returns: z.number(),
 	handler: async (ctx, args) => {
-		let contacts;
+		let contacts: Array<{ _id: any }>;
 		if (args.userGroup !== undefined) {
 			contacts = await ctx.db
 				.query("contacts")
@@ -212,8 +213,8 @@ export const listContacts = zq({
 		hasMore: z.boolean(),
 	}),
 	handler: async (ctx, args) => {
-		let allContacts;
-		
+		let allContacts: Array<{ _id: any }>;
+
 		// Get all contacts matching the filters
 		if (args.userGroup !== undefined) {
 			allContacts = await ctx.db
@@ -249,7 +250,10 @@ export const listContacts = zq({
 		allContacts.sort((a, b) => b.createdAt - a.createdAt);
 
 		const total = allContacts.length;
-		const paginatedContacts = allContacts.slice(args.offset, args.offset + args.limit);
+		const paginatedContacts = allContacts.slice(
+			args.offset,
+			args.offset + args.limit,
+		);
 		const hasMore = args.offset + args.limit < total;
 
 		return {
@@ -288,10 +292,12 @@ export const addContact = za({
 
 		if (!response.ok) {
 			const errorText = await response.text();
-			
+
 			if (response.status === 409) {
-				console.log(`Contact ${args.contact.email} already exists, updating instead`);
-				
+				console.log(
+					`Contact ${args.contact.email} already exists, updating instead`,
+				);
+
 				const findResponse = await fetch(
 					`${LOOPS_API_BASE_URL}/contacts/find?email=${encodeURIComponent(args.contact.email)}`,
 					{
@@ -300,34 +306,43 @@ export const addContact = za({
 							Authorization: `Bearer ${args.apiKey}`,
 							"Content-Type": "application/json",
 						},
-					}
+					},
 				);
 
 				if (!findResponse.ok) {
 					const findErrorText = await findResponse.text();
-					console.error(`Failed to find existing contact [${findResponse.status}]:`, findErrorText);
+					console.error(
+						`Failed to find existing contact [${findResponse.status}]:`,
+						findErrorText,
+					);
 				}
 
-				const updateResponse = await fetch(`${LOOPS_API_BASE_URL}/contacts/update`, {
-					method: "PUT",
-					headers: {
-						Authorization: `Bearer ${args.apiKey}`,
-						"Content-Type": "application/json",
+				const updateResponse = await fetch(
+					`${LOOPS_API_BASE_URL}/contacts/update`,
+					{
+						method: "PUT",
+						headers: {
+							Authorization: `Bearer ${args.apiKey}`,
+							"Content-Type": "application/json",
+						},
+						body: JSON.stringify({
+							email: args.contact.email,
+							firstName: args.contact.firstName,
+							lastName: args.contact.lastName,
+							userId: args.contact.userId,
+							source: args.contact.source,
+							subscribed: args.contact.subscribed,
+							userGroup: args.contact.userGroup,
+						}),
 					},
-					body: JSON.stringify({
-						email: args.contact.email,
-						firstName: args.contact.firstName,
-						lastName: args.contact.lastName,
-						userId: args.contact.userId,
-						source: args.contact.source,
-						subscribed: args.contact.subscribed,
-						userGroup: args.contact.userGroup,
-					}),
-				});
+				);
 
 				if (!updateResponse.ok) {
 					const updateErrorText = await updateResponse.text();
-					console.error(`Loops API error [${updateResponse.status}]:`, updateErrorText);
+					console.error(
+						`Loops API error [${updateResponse.status}]:`,
+						updateErrorText,
+					);
 					throw sanitizeError(updateResponse.status, updateErrorText);
 				}
 
@@ -339,7 +354,7 @@ export const addContact = za({
 				}
 
 				// Store/update in our database
-				await ctx.runMutation(((internal as any).lib).storeContact as any, {
+				await ctx.runMutation((internal as any).lib.storeContact as any, {
 					email: args.contact.email,
 					firstName: args.contact.firstName,
 					lastName: args.contact.lastName,
@@ -364,7 +379,7 @@ export const addContact = za({
 		// Contact was created successfully
 		const data = (await response.json()) as { id?: string };
 
-		await ctx.runMutation(((internal as any).lib).storeContact as any, {
+		await ctx.runMutation((internal as any).lib.storeContact as any, {
 			email: args.contact.email,
 			firstName: args.contact.firstName,
 			lastName: args.contact.lastName,
@@ -425,7 +440,7 @@ export const updateContact = za({
 			throw sanitizeError(response.status, errorText);
 		}
 
-		await ctx.runMutation(((internal as any).lib).storeContact as any, {
+		await ctx.runMutation((internal as any).lib.storeContact as any, {
 			email: args.email,
 			firstName: args.firstName,
 			lastName: args.lastName,
@@ -470,19 +485,19 @@ export const sendTransactional = za({
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error(`Loops API error [${response.status}]:`, errorText);
-			await ctx.runMutation(((internal as any).lib).logEmailOperation as any, {
+			await ctx.runMutation((internal as any).lib.logEmailOperation as any, {
 				operationType: "transactional",
 				email: args.email,
 				success: false,
 				transactionalId: args.transactionalId,
 			});
-			
+
 			throw sanitizeError(response.status, errorText);
 		}
 
 		const data = (await response.json()) as { messageId?: string };
 
-		await ctx.runMutation(((internal as any).lib).logEmailOperation as any, {
+		await ctx.runMutation((internal as any).lib.logEmailOperation as any, {
 			operationType: "transactional",
 			email: args.email,
 			success: true,
@@ -510,7 +525,7 @@ export const sendEvent = za({
 	returns: z.object({
 		success: z.boolean(),
 	}),
-	handler: async (ctx, args) => {
+	handler: async (_ctx, args) => {
 		const response = await fetch(`${LOOPS_API_BASE_URL}/events/send`, {
 			method: "POST",
 			headers: {
@@ -561,7 +576,7 @@ export const deleteContact = za({
 			throw sanitizeError(response.status, errorText);
 		}
 
-		await ctx.runMutation(((internal as any).lib).removeContact as any, {
+		await ctx.runMutation((internal as any).lib.removeContact as any, {
 			email: args.email,
 		});
 
@@ -574,15 +589,15 @@ export const deleteContact = za({
  * Note: Loops in Loops.so are triggered through events, not a direct API endpoint.
  * This function uses the events endpoint to trigger the loop.
  * The loop must be configured in the Loops dashboard to listen for events.
- * 
+ *
  * IMPORTANT: Loops.so doesn't have a direct /loops/trigger endpoint.
  * Loops are triggered by sending events. Make sure your loop in the dashboard
  * is configured to trigger on an event name (e.g., "loop_trigger").
- * 
+ *
  * If you need to trigger a specific loop, you should:
  * 1. Configure the loop in the dashboard to listen for a specific event name
  * 2. Use sendEvent() with that event name instead
- * 
+ *
  * This function is kept for backwards compatibility but works by sending an event.
  */
 export const triggerLoop = za({
@@ -602,10 +617,10 @@ export const triggerLoop = za({
 		// Loops are triggered through events. We'll use the events endpoint.
 		// Default event name if not provided
 		const eventName = args.eventName || `loop_${args.loopId}`;
-		
+
 		try {
 			// Send event to trigger the loop
-			await ctx.runAction(((internal as any).lib).sendEvent as any, {
+			await ctx.runAction((internal as any).lib.sendEvent as any, {
 				apiKey: args.apiKey,
 				email: args.email,
 				eventName,
@@ -616,7 +631,7 @@ export const triggerLoop = za({
 			});
 
 			// Log as loop operation
-			await ctx.runMutation(((internal as any).lib).logEmailOperation as any, {
+			await ctx.runMutation((internal as any).lib.logEmailOperation as any, {
 				operationType: "loop",
 				email: args.email,
 				success: true,
@@ -626,19 +641,22 @@ export const triggerLoop = za({
 
 			return {
 				success: true,
-				warning: "Loops are triggered via events. Ensure your loop is configured to listen for this event.",
+				warning:
+					"Loops are triggered via events. Ensure your loop is configured to listen for this event.",
 			};
 		} catch (error) {
 			// Log failed loop operation
-			await ctx.runMutation(((internal as any).lib).logEmailOperation as any, {
+			await ctx.runMutation((internal as any).lib.logEmailOperation as any, {
 				operationType: "loop",
 				email: args.email,
 				success: false,
 				loopId: args.loopId,
 				eventName,
-				metadata: { error: error instanceof Error ? error.message : String(error) },
+				metadata: {
+					error: error instanceof Error ? error.message : String(error),
+				},
 			});
-			
+
 			throw error;
 		}
 	},
@@ -670,7 +688,7 @@ export const findContact = za({
 			})
 			.optional(),
 	}),
-	handler: async (ctx, args) => {
+	handler: async (_ctx, args) => {
 		const response = await fetch(
 			`${LOOPS_API_BASE_URL}/contacts/find?email=${encodeURIComponent(args.email)}`,
 			{
@@ -691,7 +709,9 @@ export const findContact = za({
 			throw sanitizeError(response.status, errorText);
 		}
 
-		const data = (await response.json()) as Record<string, any> | Array<Record<string, any>>;
+		const data = (await response.json()) as
+			| Record<string, any>
+			| Array<Record<string, any>>;
 
 		// Handle case where Loops returns an array instead of a single object
 		let contact = Array.isArray(data) ? data[0] : data;
@@ -699,7 +719,10 @@ export const findContact = za({
 		// Convert null values to undefined for optional fields (Zod handles undefined but not null in optional())
 		if (contact) {
 			contact = Object.fromEntries(
-				Object.entries(contact).map(([key, value]) => [key, value === null ? undefined : value])
+				Object.entries(contact).map(([key, value]) => [
+					key,
+					value === null ? undefined : value,
+				]),
 			) as Record<string, any>;
 		}
 
@@ -724,35 +747,43 @@ export const batchCreateContacts = za({
 		success: z.boolean(),
 		created: z.number().optional(),
 		failed: z.number().optional(),
-		results: z.array(z.object({
-			email: z.string(),
-			success: z.boolean(),
-			error: z.string().optional(),
-		})).optional(),
+		results: z
+			.array(
+				z.object({
+					email: z.string(),
+					success: z.boolean(),
+					error: z.string().optional(),
+				}),
+			)
+			.optional(),
 	}),
 	handler: async (ctx, args) => {
 		let created = 0;
 		let failed = 0;
-		const results: Array<{ email: string; success: boolean; error?: string }> = [];
+		const results: Array<{ email: string; success: boolean; error?: string }> =
+			[];
 
 		// Create contacts one by one since Loops.so doesn't have a batch endpoint
 		for (const contact of args.contacts) {
 			try {
 				// Use the addContact function which handles create/update logic
-				const result = await ctx.runAction(((internal as any).lib).addContact as any, {
-					apiKey: args.apiKey,
-					contact,
-				});
+				const result = await ctx.runAction(
+					(internal as any).lib.addContact as any,
+					{
+						apiKey: args.apiKey,
+						contact,
+					},
+				);
 
 				if (result.success) {
 					created++;
 					results.push({ email: contact.email, success: true });
 				} else {
 					failed++;
-					results.push({ 
-						email: contact.email, 
-						success: false, 
-						error: "Unknown error" 
+					results.push({
+						email: contact.email,
+						success: false,
+						error: "Unknown error",
 					});
 				}
 			} catch (error) {
@@ -802,7 +833,7 @@ export const unsubscribeContact = za({
 			throw sanitizeError(response.status, errorText);
 		}
 
-		await ctx.runMutation(((internal as any).lib).storeContact as any, {
+		await ctx.runMutation((internal as any).lib.storeContact as any, {
 			email: args.email,
 			subscribed: false,
 		});
@@ -839,7 +870,7 @@ export const resubscribeContact = za({
 			throw sanitizeError(response.status, errorText);
 		}
 
-		await ctx.runMutation(((internal as any).lib).storeContact as any, {
+		await ctx.runMutation((internal as any).lib.storeContact as any, {
 			email: args.email,
 			subscribed: true,
 		});
@@ -858,15 +889,17 @@ export const detectRecipientSpam = zq({
 		maxEmailsPerRecipient: z.number().default(10),
 	}),
 	returns: z.array(
-		z.object({
-			email: z.string(),
-			count: z.number(),
-			timeWindowMs: z.number(),
-		}),
+		z
+			.object({
+				email: z.string(),
+				count: z.number(),
+				timeWindowMs: z.number(),
+			})
+			.catchall(z.any()),
 	),
 	handler: async (ctx, args) => {
 		const cutoffTime = Date.now() - args.timeWindowMs;
-		
+
 		const operations = await ctx.db
 			.query("emailOperations")
 			.withIndex("timestamp", (q) => q.gte("timestamp", cutoffTime))
@@ -879,7 +912,11 @@ export const detectRecipientSpam = zq({
 			}
 		}
 
-		const suspicious: Array<{ email: string; count: number; timeWindowMs: number }> = [];
+		const suspicious: Array<{
+			email: string;
+			count: number;
+			timeWindowMs: number;
+		}> = [];
 		for (const [email, count] of emailCounts.entries()) {
 			if (count > args.maxEmailsPerRecipient) {
 				suspicious.push({
@@ -912,7 +949,7 @@ export const detectActorSpam = zq({
 	),
 	handler: async (ctx, args) => {
 		const cutoffTime = Date.now() - args.timeWindowMs;
-		
+
 		const operations = await ctx.db
 			.query("emailOperations")
 			.withIndex("timestamp", (q) => q.gte("timestamp", cutoffTime))
@@ -925,7 +962,11 @@ export const detectActorSpam = zq({
 			}
 		}
 
-		const suspicious: Array<{ actorId: string; count: number; timeWindowMs: number }> = [];
+		const suspicious: Array<{
+			actorId: string;
+			count: number;
+			timeWindowMs: number;
+		}> = [];
 		for (const [actorId, count] of actorCounts.entries()) {
 			if (count > args.maxEmailsPerActor) {
 				suspicious.push({
@@ -947,17 +988,19 @@ export const getEmailStats = zq({
 	args: z.object({
 		timeWindowMs: z.number().default(86400000),
 	}),
-	returns: z.object({
-		totalOperations: z.number(),
-		successfulOperations: z.number(),
-		failedOperations: z.number(),
-		operationsByType: z.record(z.string(), z.number()),
-		uniqueRecipients: z.number(),
-		uniqueActors: z.number(),
-	}),
+	returns: z
+		.object({
+			totalOperations: z.number(),
+			successfulOperations: z.number(),
+			failedOperations: z.number(),
+			operationsByType: z.record(z.string(), z.number()),
+			uniqueRecipients: z.number(),
+			uniqueActors: z.number(),
+		})
+		.catchall(z.any()),
 	handler: async (ctx, args) => {
 		const cutoffTime = Date.now() - args.timeWindowMs;
-		
+
 		const operations = await ctx.db
 			.query("emailOperations")
 			.withIndex("timestamp", (q) => q.gte("timestamp", cutoffTime))
@@ -975,11 +1018,11 @@ export const getEmailStats = zq({
 		for (const op of operations) {
 			stats.operationsByType[op.operationType] =
 				(stats.operationsByType[op.operationType] ?? 0) + 1;
-			
+
 			if (op.email && op.email !== "audience") {
 				stats.uniqueRecipients.add(op.email);
 			}
-			
+
 			if (op.actorId) {
 				stats.uniqueActors.add(op.actorId);
 			}
@@ -1014,7 +1057,7 @@ export const detectRapidFirePatterns = zq({
 	),
 	handler: async (ctx, args) => {
 		const cutoffTime = Date.now() - args.timeWindowMs;
-		
+
 		const operations = await ctx.db
 			.query("emailOperations")
 			.withIndex("timestamp", (q) => q.gte("timestamp", cutoffTime))
@@ -1037,7 +1080,7 @@ export const detectRapidFirePatterns = zq({
 				if (!emailGroups.has(op.email)) {
 					emailGroups.set(op.email, []);
 				}
-				emailGroups.get(op.email)!.push(op);
+				emailGroups.get(op.email)?.push(op);
 			}
 		}
 
@@ -1045,13 +1088,13 @@ export const detectRapidFirePatterns = zq({
 			for (let i = 0; i < ops.length; i++) {
 				const op = ops[i];
 				if (!op) continue;
-				
+
 				const windowStart = op.timestamp;
 				const windowEnd = windowStart + args.timeWindowMs;
 				const opsInWindow = ops.filter(
 					(op) => op.timestamp >= windowStart && op.timestamp <= windowEnd,
 				);
-				
+
 				if (opsInWindow.length >= args.minEmailsInWindow) {
 					patterns.push({
 						email,
@@ -1070,7 +1113,7 @@ export const detectRapidFirePatterns = zq({
 				if (!actorGroups.has(op.actorId)) {
 					actorGroups.set(op.actorId, []);
 				}
-				actorGroups.get(op.actorId)!.push(op);
+				actorGroups.get(op.actorId)?.push(op);
 			}
 		}
 
@@ -1078,13 +1121,13 @@ export const detectRapidFirePatterns = zq({
 			for (let i = 0; i < ops.length; i++) {
 				const op = ops[i];
 				if (!op) continue;
-				
+
 				const windowStart = op.timestamp;
 				const windowEnd = windowStart + args.timeWindowMs;
 				const opsInWindow = ops.filter(
 					(op) => op.timestamp >= windowStart && op.timestamp <= windowEnd,
 				);
-				
+
 				if (opsInWindow.length >= args.minEmailsInWindow) {
 					patterns.push({
 						actorId,
@@ -1111,13 +1154,15 @@ export const checkRecipientRateLimit = zq({
 		timeWindowMs: z.number(),
 		maxEmails: z.number(),
 	}),
-	returns: z.object({
-		allowed: z.boolean(),
-		count: z.number(),
-		limit: z.number(),
-		timeWindowMs: z.number(),
-		retryAfter: z.number().optional(),
-	}),
+	returns: z
+		.object({
+			allowed: z.boolean(),
+			count: z.number(),
+			limit: z.number(),
+			timeWindowMs: z.number(),
+			retryAfter: z.number().optional(),
+		})
+		.catchall(z.any()),
 	handler: async (ctx, args) => {
 		const cutoffTime = Date.now() - args.timeWindowMs;
 

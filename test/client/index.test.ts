@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { defineSchema } from "convex/server";
 import { Loops } from "../../src/client";
-import { components, initConvexTest } from "./setup.test.js";
+import { components } from "./setup.test.js";
 
 // The schema for the tests
-const schema = defineSchema({});
+const _schema = defineSchema({});
 
 describe("Loops thick client", () => {
 	test("should create Loops client", () => {
@@ -21,7 +21,7 @@ describe("Loops thick client", () => {
 		expect(() => {
 			new Loops(components.loops);
 		}).toThrow("Loops API key is required");
-		
+
 		if (originalEnv) {
 			process.env.LOOPS_API_KEY = originalEnv;
 		}

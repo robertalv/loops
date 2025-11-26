@@ -36,4 +36,3 @@ export const eventValidator = z.object({
 	eventName: z.string(),
 	eventProperties: z.record(z.string(), z.any()).optional(),
 });
-

@@ -8,7 +8,7 @@
 		"outDir": "./dist",
 		"rootDir": "./src",
 		"skipLibCheck": true,
-		"noImplicitAny": false,
+		"noImplicitAny": false
 	},
 	"include": ["src/**/*"],
 	"exclude": [

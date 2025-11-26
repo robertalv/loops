@@ -13,4 +13,3 @@ export const Contacts = zodTable("contacts", {
 	createdAt: z.number(),
 	updatedAt: z.number(),
 });
-

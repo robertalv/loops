@@ -2,12 +2,7 @@ import { z } from "zod";
 import { zodTable } from "zodvex";
 
 export const EmailOperations = zodTable("emailOperations", {
-	operationType: z.enum([
-		"transactional",
-		"event",
-		"campaign",
-		"loop",
-	]),
+	operationType: z.enum(["transactional", "event", "campaign", "loop"]),
 	email: z.string().email(),
 	actorId: z.string().optional(),
 	transactionalId: z.string().optional(),
@@ -19,4 +14,3 @@ export const EmailOperations = zodTable("emailOperations", {
 	messageId: z.string().optional(),
 	metadata: z.optional(z.record(z.string(), z.any())),
 });
-
