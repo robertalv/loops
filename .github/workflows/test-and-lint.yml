@@ -30,6 +30,7 @@ jobs:
         run: bun run build
 
       - name: Publish package preview
+        continue-on-error: true
         run: bunx pkg-pr-new publish
 
       - name: Test
