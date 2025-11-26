@@ -61,7 +61,7 @@
     "prepare": "npm run build || true",
     "changeset": "changeset",
     "ci:version": "changeset version && bun update",
-    "ci:publish": "bun run preversion && changeset publish",
+    "ci:publish": "changeset publish",
     "preversion": "bun run clean && bun install && run-p test lint typecheck attw",
     "version": "pbcopy <<<$npm_package_version; vim CHANGELOG.md && biome format --write CHANGELOG.md && git add CHANGELOG.md",
     "postversion": "git push --follow-tags",
