@@ -8,7 +8,7 @@ import {
 	type SchemaDefinition,
 } from "convex/server";
 import { convexTest } from "convex-test";
-import type { ShardedCounterComponent } from "../../src/client/index.js";
+import type { LoopsComponentComponent } from "../../src/client/index.js";
 import componentSchema from "../../src/component/schema.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -43,12 +43,12 @@ export function initConvexTest<
 	Schema extends SchemaDefinition<GenericSchema, boolean>,
 >(schema?: Schema) {
 	const t = convexTest(schema ?? defineSchema({}), modules);
-	t.registerComponent("shardedCounter", componentSchema, componentModules);
+	t.registerComponent("loops", componentSchema, componentModules);
 	return t;
 }
 
 export const components = componentsGeneric() as unknown as {
-	shardedCounter: ShardedCounterComponent;
+	loops: LoopsComponentComponent;
 };
 
 test("setup", () => {});

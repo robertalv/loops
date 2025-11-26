@@ -1,61 +1,559 @@
-import { mutationGeneric, queryGeneric } from "convex/server";
+import { actionGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
 import type { Mounts } from "../component/_generated/api.js";
-import type { RunMutationCtx, RunQueryCtx, UseApi } from "./types.js";
+import type { RunActionCtx, RunQueryCtx, UseApi } from "./types.js";
 
-// UseApi<typeof api> is an alternative that has jump-to-definition but is
-// less stable and reliant on types within the component files, which can cause
-// issues where passing `components.foo` doesn't match the argument
-export type ShardedCounterComponent = UseApi<Mounts>;
+export type LoopsComponent = UseApi<Mounts>;
 
-export class ShardedCounter<Shards extends Record<string, number>> {
+export interface ContactData {
+	email: string;
+	firstName?: string;
+	lastName?: string;
+	userId?: string;
+	source?: string;
+	subscribed?: boolean;
+	userGroup?: string;
+}
+
+export interface TransactionalEmailOptions {
+	transactionalId: string;
+	email: string;
+	dataVariables?: Record<string, any>;
+}
+
+export interface EventOptions {
+	email: string;
+	eventName: string;
+	eventProperties?: Record<string, any>;
+}
+
+export class Loops {
+	private readonly component: LoopsComponent;
+	public readonly options?: {
+		apiKey?: string;
+	};
+	
 	constructor(
-		public component: ShardedCounterComponent,
-		public options?: {
-			shards?: Shards;
-			defaultShards?: number;
+		component: LoopsComponent,
+		options?: {
+			apiKey?: string;
 		},
-	) {}
-
-	async add<Name extends string = keyof Shards & string>(
-		ctx: RunMutationCtx,
-		name: Name,
-		count: number = 1,
 	) {
-		const shards = this.options?.shards?.[name] ?? this.options?.defaultShards;
-		return ctx.runMutation(this.component.lib.add, {
-			name,
-			count,
-			shards,
+		if (!component) {
+			throw new Error(
+				"Loops component reference is required. " +
+					"Make sure the component is mounted in your convex.config.ts and use: " +
+					"new Loops(components.loops)"
+			);
+		}
+		
+		if (!component.lib) {
+			throw new Error(
+				"Invalid component reference. " +
+					"The component may not be properly mounted. " +
+					"Ensure the component is correctly mounted in convex.config.ts: " +
+					"app.use(loops);"
+			);
+		}
+		
+		this.component = component;
+		this.options = options;
+		
+		const apiKey = options?.apiKey ?? process.env.LOOPS_API_KEY;
+		if (!apiKey) {
+			throw new Error(
+				"Loops API key is required. Set LOOPS_API_KEY in your Convex environment variables."
+			);
+		}
+
+		if (options?.apiKey) {
+			console.warn(
+				"API key passed directly via options. " +
+					"For security, use LOOPS_API_KEY environment variable instead. " +
+					"See ENV_SETUP.md for details.",
+			);
+		}
+
+		this.apiKey = apiKey;
+	}
+
+	private readonly apiKey: string;
+
+	/**
+	 * Add or update a contact in Loops
+	 */
+	async addContact(ctx: RunActionCtx, contact: ContactData) {
+		if (!this.component) {
+			throw new Error(
+				"Loops component is not initialized. " +
+					"Make sure to pass components.loops to the Loops constructor: " +
+					"new Loops(components.loops)"
+			);
+		}
+		if (!this.component.lib) {
+			throw new Error(
+				"Invalid component reference. " +
+					"The component may not be properly mounted. " +
+					"Ensure the component is correctly mounted in convex.config.ts: " +
+					"app.use(loops);"
+			);
+		}
+		return ctx.runAction((this.component.lib as any).addContact, {
+			apiKey: this.apiKey,
+			contact,
 		});
 	}
 
-	async count<Name extends string = keyof Shards & string>(
-		ctx: RunQueryCtx,
-		name: Name,
+	/**
+	 * Update an existing contact in Loops
+	 */
+	async updateContact(
+		ctx: RunActionCtx,
+		email: string,
+		updates: Partial<ContactData> & {
+			dataVariables?: Record<string, any>;
+		},
 	) {
-		return ctx.runQuery(this.component.lib.count, { name });
+		return ctx.runAction((this.component.lib as any).updateContact, {
+			apiKey: this.apiKey,
+			email,
+			...updates,
+		});
+	}
+
+	/**
+	 * Send a transactional email using a transactional ID
+	 */
+	async sendTransactional(ctx: RunActionCtx, options: TransactionalEmailOptions) {
+		return ctx.runAction((this.component.lib as any).sendTransactional, {
+			apiKey: this.apiKey,
+			...options,
+		});
+	}
+
+	/**
+	 * Send an event to Loops to trigger email workflows
+	 */
+	async sendEvent(ctx: RunActionCtx, options: EventOptions) {
+		return ctx.runAction((this.component.lib as any).sendEvent, {
+			apiKey: this.apiKey,
+			...options,
+		});
+	}
+
+	/**
+	 * Find a contact by email
+	 * Retrieves contact information from Loops
+	 */
+	async findContact(ctx: RunActionCtx, email: string) {
+		return ctx.runAction((this.component.lib as any).findContact, {
+			apiKey: this.apiKey,
+			email,
+		});
+	}
+
+	/**
+	 * Batch create contacts
+	 * Create multiple contacts in a single API call
+	 */
+	async batchCreateContacts(ctx: RunActionCtx, contacts: ContactData[]) {
+		return ctx.runAction((this.component.lib as any).batchCreateContacts, {
+			apiKey: this.apiKey,
+			contacts,
+		});
+	}
+
+	/**
+	 * Unsubscribe a contact
+	 * Unsubscribes a contact from receiving emails (they remain in the system)
+	 */
+	async unsubscribeContact(ctx: RunActionCtx, email: string) {
+		return ctx.runAction((this.component.lib as any).unsubscribeContact, {
+			apiKey: this.apiKey,
+			email,
+		});
+	}
+
+	/**
+	 * Resubscribe a contact
+	 * Resubscribes a previously unsubscribed contact
+	 */
+	async resubscribeContact(ctx: RunActionCtx, email: string) {
+		return ctx.runAction((this.component.lib as any).resubscribeContact, {
+			apiKey: this.apiKey,
+			email,
+		});
+	}
+
+	/**
+	 * Count contacts in the database
+	 * Can filter by audience criteria (userGroup, source, subscribed status)
+	 * This queries the component's local database, not Loops API
+	 */
+	async countContacts(
+		ctx: RunQueryCtx,
+		options?: {
+			userGroup?: string;
+			source?: string;
+			subscribed?: boolean;
+		},
+	) {
+		return ctx.runQuery((this.component.lib as any).countContacts, options ?? {});
+	}
+
+	/**
+	 * List contacts with pagination and optional filters
+	 * Returns actual contact data, not just a count
+	 * This queries the component's local database, not Loops API
+	 */
+	async listContacts(
+		ctx: RunQueryCtx,
+		options?: {
+			userGroup?: string;
+			source?: string;
+			subscribed?: boolean;
+			limit?: number;
+			offset?: number;
+		},
+	) {
+		return ctx.runQuery((this.component.lib as any).listContacts, {
+			userGroup: options?.userGroup,
+			source: options?.source,
+			subscribed: options?.subscribed,
+			limit: options?.limit ?? 100,
+			offset: options?.offset ?? 0,
+		});
+	}
+
+	/**
+	 * Detect spam patterns: emails sent to the same recipient too frequently
+	 */
+	async detectRecipientSpam(
+		ctx: RunQueryCtx,
+		options?: {
+			timeWindowMs?: number;
+			maxEmailsPerRecipient?: number;
+		},
+	) {
+		return ctx.runQuery((this.component.lib as any).detectRecipientSpam, {
+			timeWindowMs: options?.timeWindowMs ?? 3600000,
+			maxEmailsPerRecipient: options?.maxEmailsPerRecipient ?? 10,
+		});
+	}
+
+	/**
+	 * Detect spam patterns: emails sent by the same actor/user too frequently
+	 */
+	async detectActorSpam(
+		ctx: RunQueryCtx,
+		options?: {
+			timeWindowMs?: number;
+			maxEmailsPerActor?: number;
+		},
+	) {
+		return ctx.runQuery((this.component.lib as any).detectActorSpam, {
+			timeWindowMs: options?.timeWindowMs ?? 3600000,
+			maxEmailsPerActor: options?.maxEmailsPerActor ?? 100,
+		});
+	}
+
+	/**
+	 * Get email operation statistics for monitoring
+	 */
+	async getEmailStats(
+		ctx: RunQueryCtx,
+		options?: {
+			timeWindowMs?: number;
+		},
+	) {
+		return ctx.runQuery((this.component.lib as any).getEmailStats, {
+			timeWindowMs: options?.timeWindowMs ?? 86400000,
+		});
+	}
+
+	/**
+	 * Detect rapid-fire email sending patterns
+	 */
+	async detectRapidFirePatterns(
+		ctx: RunQueryCtx,
+		options?: {
+			timeWindowMs?: number;
+			minEmailsInWindow?: number;
+		},
+	) {
+		return ctx.runQuery((this.component.lib as any).detectRapidFirePatterns, {
+			timeWindowMs: options?.timeWindowMs ?? 60000,
+			minEmailsInWindow: options?.minEmailsInWindow ?? 5,
+		});
+	}
+
+	/**
+	 * Check if an email can be sent to a recipient based on rate limits
+	 */
+	async checkRecipientRateLimit(
+		ctx: RunQueryCtx,
+		options: {
+			email: string;
+			timeWindowMs: number;
+			maxEmails: number;
+		},
+	) {
+		return ctx.runQuery((this.component.lib as any).checkRecipientRateLimit, options);
+	}
+
+	/**
+	 * Check if an actor/user can send more emails based on rate limits
+	 */
+	async checkActorRateLimit(
+		ctx: RunQueryCtx,
+		options: {
+			actorId: string;
+			timeWindowMs: number;
+			maxEmails: number;
+		},
+	) {
+		return ctx.runQuery((this.component.lib as any).checkActorRateLimit, options);
+	}
+
+	/**
+	 * Check global email sending rate limit
+	 */
+	async checkGlobalRateLimit(
+		ctx: RunQueryCtx,
+		options: {
+			timeWindowMs: number;
+			maxEmails: number;
+		},
+	) {
+		return ctx.runQuery((this.component.lib as any).checkGlobalRateLimit, options);
+	}
+
+	/**
+	 * Delete a contact from Loops
+	 */
+	async deleteContact(ctx: RunActionCtx, email: string) {
+		return ctx.runAction((this.component.lib as any).deleteContact, {
+			apiKey: this.apiKey,
+			email,
+		});
+	}
+
+	/**
+	 * Trigger a loop for a contact
+	 * Loops are automated email sequences that can be triggered by events
+	 * 
+	 * Note: Loops.so doesn't have a direct loop trigger endpoint.
+	 * Loops are triggered through events. Make sure your loop is configured
+	 * in the Loops dashboard to listen for events.
+	 * 
+	 * @param options.eventName - Optional event name. If not provided, uses `loop_{loopId}`
+	 */
+	async triggerLoop(
+		ctx: RunActionCtx,
+		options: {
+			loopId: string;
+			email: string;
+			dataVariables?: Record<string, any>;
+			eventName?: string; // Event name that triggers the loop
+		},
+	) {
+		return ctx.runAction((this.component.lib as any).triggerLoop, {
+			apiKey: this.apiKey,
+			...options,
+		});
 	}
 
 	/**
 	 * For easy re-exporting.
 	 * Apps can do
 	 * ```ts
-	 * export const { add, count } = shardedCounter.api();
+	 * export const { addContact, sendTransactional, sendEvent, triggerLoop } = loops.api();
 	 * ```
 	 */
 	api() {
 		return {
-			add: mutationGeneric({
-				args: { name: v.string() },
+			addContact: actionGeneric({
+				args: {
+					email: v.string(),
+					firstName: v.optional(v.string()),
+					lastName: v.optional(v.string()),
+					userId: v.optional(v.string()),
+					source: v.optional(v.string()),
+					subscribed: v.optional(v.boolean()),
+					userGroup: v.optional(v.string()),
+				},
 				handler: async (ctx, args) => {
-					await this.add(ctx, args.name);
+					return await this.addContact(ctx, args);
 				},
 			}),
-			count: queryGeneric({
-				args: { name: v.string() },
+			updateContact: actionGeneric({
+				args: {
+					email: v.string(),
+					firstName: v.optional(v.string()),
+					lastName: v.optional(v.string()),
+					userId: v.optional(v.string()),
+					source: v.optional(v.string()),
+					subscribed: v.optional(v.boolean()),
+					userGroup: v.optional(v.string()),
+					dataVariables: v.optional(v.any()),
+				},
 				handler: async (ctx, args) => {
-					return await this.count(ctx, args.name);
+					const { email, ...updates } = args;
+					return await this.updateContact(ctx, email, updates);
+				},
+			}),
+			sendTransactional: actionGeneric({
+				args: {
+					transactionalId: v.string(),
+					email: v.string(),
+					dataVariables: v.optional(v.any()),
+				},
+				handler: async (ctx, args) => {
+					return await this.sendTransactional(ctx, args);
+				},
+			}),
+			sendEvent: actionGeneric({
+				args: {
+					email: v.string(),
+					eventName: v.string(),
+					eventProperties: v.optional(v.any()),
+				},
+				handler: async (ctx, args) => {
+					return await this.sendEvent(ctx, args);
+				},
+			}),
+			deleteContact: actionGeneric({
+				args: {
+					email: v.string(),
+				},
+				handler: async (ctx, args) => {
+					return await this.deleteContact(ctx, args.email);
+				},
+			}),
+			triggerLoop: actionGeneric({
+				args: {
+					loopId: v.string(),
+					email: v.string(),
+					dataVariables: v.optional(v.any()),
+				},
+				handler: async (ctx, args) => {
+					return await this.triggerLoop(ctx, args);
+				},
+			}),
+			findContact: actionGeneric({
+				args: {
+					email: v.string(),
+				},
+				handler: async (ctx, args) => {
+					return await this.findContact(ctx, args.email);
+				},
+			}),
+			batchCreateContacts: actionGeneric({
+				args: {
+					contacts: v.array(
+						v.object({
+							email: v.string(),
+							firstName: v.optional(v.string()),
+							lastName: v.optional(v.string()),
+							userId: v.optional(v.string()),
+							source: v.optional(v.string()),
+							subscribed: v.optional(v.boolean()),
+							userGroup: v.optional(v.string()),
+						}),
+					),
+				},
+				handler: async (ctx, args) => {
+					return await this.batchCreateContacts(ctx, args.contacts);
+				},
+			}),
+			unsubscribeContact: actionGeneric({
+				args: {
+					email: v.string(),
+				},
+				handler: async (ctx, args) => {
+					return await this.unsubscribeContact(ctx, args.email);
+				},
+			}),
+			resubscribeContact: actionGeneric({
+				args: {
+					email: v.string(),
+				},
+				handler: async (ctx, args) => {
+					return await this.resubscribeContact(ctx, args.email);
+				},
+			}),
+			countContacts: queryGeneric({
+				args: {
+					userGroup: v.optional(v.string()),
+					source: v.optional(v.string()),
+					subscribed: v.optional(v.boolean()),
+				},
+				handler: async (ctx, args) => {
+					return await this.countContacts(ctx, args);
+				},
+			}),
+			detectRecipientSpam: queryGeneric({
+				args: {
+					timeWindowMs: v.optional(v.number()),
+					maxEmailsPerRecipient: v.optional(v.number()),
+				},
+				handler: async (ctx, args) => {
+					return await this.detectRecipientSpam(ctx, args);
+				},
+			}),
+			detectActorSpam: queryGeneric({
+				args: {
+					timeWindowMs: v.optional(v.number()),
+					maxEmailsPerActor: v.optional(v.number()),
+				},
+				handler: async (ctx, args) => {
+					return await this.detectActorSpam(ctx, args);
+				},
+			}),
+			getEmailStats: queryGeneric({
+				args: {
+					timeWindowMs: v.optional(v.number()),
+				},
+				handler: async (ctx, args) => {
+					return await this.getEmailStats(ctx, args);
+				},
+			}),
+			detectRapidFirePatterns: queryGeneric({
+				args: {
+					timeWindowMs: v.optional(v.number()),
+					minEmailsInWindow: v.optional(v.number()),
+				},
+				handler: async (ctx, args) => {
+					return await this.detectRapidFirePatterns(ctx, args);
+				},
+			}),
+			checkRecipientRateLimit: queryGeneric({
+				args: {
+					email: v.string(),
+					timeWindowMs: v.number(),
+					maxEmails: v.number(),
+				},
+				handler: async (ctx, args) => {
+					return await this.checkRecipientRateLimit(ctx, args);
+				},
+			}),
+			checkActorRateLimit: queryGeneric({
+				args: {
+					actorId: v.string(),
+					timeWindowMs: v.number(),
+					maxEmails: v.number(),
+				},
+				handler: async (ctx, args) => {
+					return await this.checkActorRateLimit(ctx, args);
+				},
+			}),
+			checkGlobalRateLimit: queryGeneric({
+				args: {
+					timeWindowMs: v.number(),
+					maxEmails: v.number(),
+				},
+				handler: async (ctx, args) => {
+					return await this.checkGlobalRateLimit(ctx, args);
 				},
 			}),
 		};

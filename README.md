@@ -1,494 +1,483 @@
-# 🔨 Convex Component Template
+# @devwithbobby/loops
 
-[![pkg.pr.new](https://pkg.pr.new/badge/OWNER/REPO)](https://pkg.pr.new/~/OWNER/REPO)
+[![npm version](https://img.shields.io/npm/v/@devwithbobby/loops.svg)](https://www.npmjs.com/package/@devwithbobby/loops)
 
-A modern template for building reusable [Convex components](https://www.convex.dev/components) with Bun, TypeScript, and comprehensive testing.
+A Convex component for integrating with [Loops.so](https://loops.so) email marketing platform. Send transactional emails, manage contacts, trigger loops, and monitor email operations with built-in spam detection and rate limiting.
 
-> **Note:** Replace `OWNER/REPO` in the badge above with your GitHub username/organization and repository name once you set up your repository.
+## Features
 
-## Getting Started
+- ✅ **Contact Management** - Create, update, find, and delete contacts
+- ✅ **Transactional Emails** - Send one-off emails with templates
+- ✅ **Events** - Trigger email workflows based on events
+- ✅ **Loops** - Trigger automated email sequences
+- ✅ **Monitoring** - Track all email operations with spam detection
+- ✅ **Rate Limiting** - Built-in rate limiting queries for abuse prevention
+- ✅ **Type-Safe** - Full TypeScript support with Zod validation
 
-### 1. Rename Your Component
-
-After cloning this template, run the rename script to customize it for your component:
+## Installation
 
 ```bash
-bun rename.ts
+npm install @devwithbobby/loops
+# or
+bun add @devwithbobby/loops
 ```
 
-The script will:
-- Prompt you for your component name (e.g., "document search", "rate limiter")
-- Ask for your NPM package name (default: `@samhoque/your-component-name`)
-- Ask for your GitHub repository (default: `samhoque/your-component-name`)
-- Automatically generate all case variants (PascalCase, camelCase, kebab-case, etc.)
-- Replace all template placeholders across the entire codebase
-- Update `package.json` with your package name
-- Optionally delete itself when done
+## Quick Start
 
-**What gets renamed:**
-- Package name in `package.json`
-- All imports and references throughout the codebase
-- Component class names, function names, and identifiers
-- Documentation examples in README and comments
+### 1. Install and Mount the Component
 
-### 2. Install Dependencies & Start Development
+In your `convex/convex.config.ts`:
+
+```typescript
+import loops from "@devwithbobby/loops/convex.config";
+import { defineApp } from "convex/server";
+
+const app = defineApp();
+app.use(loops);
+
+export default app;
+```
+
+### 2. Set Up Environment Variables
+
+**⚠️ IMPORTANT: Set your Loops API key before using the component.**
 
 ```bash
-bun install
-cd example && bun install && cd ..
+npx convex env set LOOPS_API_KEY "your-loops-api-key-here"
+```
+
+**Or via Convex Dashboard:**
+1. Go to Settings → Environment Variables
+2. Add `LOOPS_API_KEY` with your Loops.so API key
+
+Get your API key from [Loops.so Dashboard](https://app.loops.so/settings/api).
+
+### 3. Use the Component
+
+In your `convex/functions.ts` (or any convex file):
+
+```typescript
+import { Loops } from "@devwithbobby/loops";
+import { components } from "./_generated/api";
+import { action } from "./_generated/server";
+import { v } from "convex/values";
+
+// Initialize the Loops client
+const loops = new Loops(components.loops);
+
+// Export functions wrapped with auth (required in production)
+export const addContact = action({
+  args: {
+    email: v.string(),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Add authentication check
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    return await loops.addContact(ctx, args);
+  },
+});
+
+export const sendWelcomeEmail = action({
+  args: {
+    email: v.string(),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    // Send transactional email
+    return await loops.sendTransactional(ctx, {
+      transactionalId: "welcome-email-template-id",
+      email: args.email,
+      dataVariables: {
+        name: args.name,
+      },
+    });
+  },
+});
+```
+
+## API Reference
+
+### Contact Management
+
+#### Add or Update Contact
+
+```typescript
+await loops.addContact(ctx, {
+  email: "user@example.com",
+  firstName: "John",
+  lastName: "Doe",
+  userId: "user123",
+  source: "webapp",
+  subscribed: true,
+  userGroup: "premium",
+});
+```
+
+#### Update Contact
+
+```typescript
+await loops.updateContact(ctx, "user@example.com", {
+  firstName: "Jane",
+  userGroup: "vip",
+});
+```
+
+#### Find Contact
+
+```typescript
+const contact = await loops.findContact(ctx, "user@example.com");
+```
+
+#### Delete Contact
+
+```typescript
+await loops.deleteContact(ctx, "user@example.com");
+```
+
+#### Batch Create Contacts
+
+```typescript
+await loops.batchCreateContacts(ctx, {
+  contacts: [
+    { email: "user1@example.com", firstName: "John" },
+    { email: "user2@example.com", firstName: "Jane" },
+  ],
+});
+```
+
+#### Unsubscribe/Resubscribe
+
+```typescript
+await loops.unsubscribeContact(ctx, "user@example.com");
+await loops.resubscribeContact(ctx, "user@example.com");
+```
+
+#### Count Contacts
+
+```typescript
+// Count all contacts
+const total = await loops.countContacts(ctx, {});
+
+// Count by filter
+const premium = await loops.countContacts(ctx, {
+  userGroup: "premium",
+  subscribed: true,
+});
+```
+
+### Email Sending
+
+#### Send Transactional Email
+
+```typescript
+await loops.sendTransactional(ctx, {
+  transactionalId: "template-id-from-loops",
+  email: "user@example.com",
+  dataVariables: {
+    name: "John",
+    orderId: "12345",
+  },
+});
+```
+
+#### Send Event (Triggers Workflows)
+
+```typescript
+await loops.sendEvent(ctx, {
+  email: "user@example.com",
+  eventName: "purchase_completed",
+  eventProperties: {
+    product: "Premium Plan",
+    amount: 99.99,
+  },
+});
+```
+
+#### Trigger Loop (Automated Sequence)
+
+```typescript
+await loops.triggerLoop(ctx, {
+  loopId: "loop-id-from-loops",
+  email: "user@example.com",
+  dataVariables: {
+    onboardingStep: "welcome",
+  },
+});
+```
+
+### Monitoring & Analytics
+
+#### Get Email Statistics
+
+```typescript
+const stats = await loops.getEmailStats(ctx, {
+  timeWindowMs: 3600000, // Last hour
+});
+
+console.log(stats.totalOperations); // Total emails sent
+console.log(stats.successfulOperations); // Successful sends
+console.log(stats.failedOperations); // Failed sends
+console.log(stats.operationsByType); // Breakdown by type
+console.log(stats.uniqueRecipients); // Unique email addresses
+```
+
+#### Detect Spam Patterns
+
+```typescript
+// Detect recipients with suspicious activity
+const spamRecipients = await loops.detectRecipientSpam(ctx, {
+  timeWindowMs: 3600000,
+  maxEmailsPerRecipient: 10,
+});
+
+// Detect actors with suspicious activity
+const spamActors = await loops.detectActorSpam(ctx, {
+  timeWindowMs: 3600000,
+  maxEmailsPerActor: 50,
+});
+
+// Detect rapid-fire patterns
+const rapidFire = await loops.detectRapidFirePatterns(ctx, {
+  timeWindowMs: 60000, // Last minute
+  maxEmailsPerWindow: 5,
+});
+```
+
+### Rate Limiting
+
+#### Check Rate Limits
+
+```typescript
+// Check recipient rate limit
+const recipientCheck = await loops.checkRecipientRateLimit(ctx, {
+  email: "user@example.com",
+  timeWindowMs: 3600000, // 1 hour
+  maxEmails: 10,
+});
+
+if (!recipientCheck.allowed) {
+  throw new Error(`Rate limit exceeded. Try again after ${recipientCheck.retryAfter}ms`);
+}
+
+// Check actor rate limit
+const actorCheck = await loops.checkActorRateLimit(ctx, {
+  actorId: "user123",
+  timeWindowMs: 60000, // 1 minute
+  maxEmails: 20,
+});
+
+// Check global rate limit
+const globalCheck = await loops.checkGlobalRateLimit(ctx, {
+  timeWindowMs: 60000,
+  maxEmails: 1000,
+});
+```
+
+**Example: Rate-limited email sending**
+
+```typescript
+export const sendTransactionalWithRateLimit = action({
+  args: {
+    transactionalId: v.string(),
+    email: v.string(),
+    actorId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const actorId = args.actorId ?? identity.subject;
+
+    // Check rate limit before sending
+    const rateLimitCheck = await loops.checkActorRateLimit(ctx, {
+      actorId,
+      timeWindowMs: 60000, // 1 minute
+      maxEmails: 10,
+    });
+
+    if (!rateLimitCheck.allowed) {
+      throw new Error(
+        `Rate limit exceeded. Please try again after ${rateLimitCheck.retryAfter}ms.`
+      );
+    }
+
+    // Send email
+    return await loops.sendTransactional(ctx, {
+      ...args,
+      actorId,
+    });
+  },
+});
+```
+
+## Using the API Helper
+
+The component also exports an `api()` helper for easier re-exporting:
+
+```typescript
+import { Loops } from "@devwithbobby/loops";
+import { components } from "./_generated/api";
+
+const loops = new Loops(components.loops);
+
+// Export all functions at once
+export const {
+  addContact,
+  updateContact,
+  sendTransactional,
+  sendEvent,
+  triggerLoop,
+  countContacts,
+  // ... all other functions
+} = loops.api();
+```
+
+**⚠️ Security Warning:** The `api()` helper exports functions without authentication. Always wrap these functions with auth checks in production:
+
+```typescript
+export const addContact = action({
+  args: { email: v.string(), ... },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    return await loops.addContact(ctx, args);
+  },
+});
+```
+
+## Security Best Practices
+
+1. **Always add authentication** - Wrap all functions with auth checks
+2. **Use environment variables** - Store API key in Convex environment variables (never hardcode)
+3. **Implement rate limiting** - Use the built-in rate limiting queries to prevent abuse
+4. **Monitor for abuse** - Use spam detection queries to identify suspicious patterns
+5. **Sanitize errors** - Don't expose sensitive error details to clients
+
+### Authentication Example
+
+All functions should be wrapped with authentication:
+
+```typescript
+export const addContact = action({
+  args: { email: v.string(), ... },
+  handler: async (ctx, args) => {
+    // Add authentication check
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    
+    // Add authorization checks if needed
+    // if (!isAdmin(identity)) throw new Error("Forbidden");
+    
+    return await loops.addContact(ctx, args);
+  },
+});
+```
+
+### Environment Variables
+
+Set `LOOPS_API_KEY` in your Convex environment:
+
+**Via CLI:**
+```bash
+npx convex env set LOOPS_API_KEY "your-api-key"
+```
+
+**Via Dashboard:**
+1. Go to your Convex Dashboard
+2. Navigate to Settings → Environment Variables
+3. Add `LOOPS_API_KEY` with your Loops.so API key value
+
+Get your API key from [Loops.so Dashboard](https://app.loops.so/settings/api).
+
+⚠️ **Never** pass the API key directly in code or via function options in production. Always use environment variables.
+
+## Monitoring & Rate Limiting
+
+The component automatically logs all email operations to the `emailOperations` table for monitoring. Use the built-in queries to:
+
+- **Track email statistics** - See total sends, success/failure rates, breakdowns by type
+- **Detect spam patterns** - Identify suspicious activity by recipient or actor
+- **Enforce rate limits** - Prevent abuse with recipient, actor, or global rate limits
+- **Monitor for abuse** - Detect rapid-fire patterns and unusual sending behavior
+
+All monitoring queries are available through the `Loops` client - see the [Monitoring & Analytics](#monitoring--analytics) section above for usage examples.
+
+## Development
+
+### Local Development
+
+To use this component in development with live reloading:
+
+```bash
 bun run dev:backend
 ```
 
-Then in another terminal:
+This starts Convex dev with `--live-component-sources` enabled, allowing changes to be reflected immediately.
+
+### Building
+
 ```bash
-cd example
-bun run dev
+npm run build
 ```
 
-## What are Convex Components?
+### Testing
 
-Components are isolated, reusable units of Convex functionality with their own:
-- Functions (queries, mutations, actions)
-- Tables and schemas
-- File storage
-- Scheduled functions
-
-Components plug into Convex apps (or parent components) through a public interface, enabling modular architecture with proper isolation and security.
+```bash
+npm test
+```
 
 ## Project Structure
 
 ```
 src/
-  component/               # The Convex component source code
-    convex.config.ts       # Component configuration (exported via package.json)
-    schema.ts              # Convex schema definition
-    lib.ts                 # Component functions (queries, mutations)
-    _generated/            # Auto-generated Convex types (gitignored)
+  component/               # The Convex component
+    convex.config.ts       # Component configuration
+    schema.ts              # Database schema
+    lib.ts                 # Component functions
+    validators.ts          # Zod validators
+    tables/                # Table definitions
 
-  client/                  # Optional: Client library that runs in the app
-    index.ts               # Helper class for easier component interaction
+  client/                  # Client library
+    index.ts               # Loops client class
+    types.ts               # TypeScript types
 
-  react/                   # Optional: React components for UI
-    index.tsx              # React hooks and components
-
-test/
-  component/               # Component tests (separate from source)
-    setup.test.ts          # Test setup with module auto-discovery
-    *.test.ts              # Unit tests for the component
-
-example/
-  convex/                  # Example app that uses the component
-    convex.config.ts       # Example app configuration
-    schema.ts              # Example app schema
-    _generated/            # Auto-generated types (gitignored)
-  src/                     # Example app frontend
+example/                   # Example app
+  convex/
+    example.ts             # Example usage
 ```
 
-## Key Commands
-
-### Development
-```bash
-bun run dev:backend          # Start Convex dev with live component sources
-bun run build                # Build the component for distribution
-```
-
-### Testing
-```bash
-bun test                     # Run all tests
-bun test --watch             # Watch mode
-bun test --coverage          # Generate coverage reports
-bun test -t "pattern"        # Filter tests by name
-CLAUDECODE=1 bun test        # AI-friendly quiet output
-```
-
-### Linting and Formatting
-```bash
-bun run lint                 # Lint with Biome
-bun run lint:fix             # Auto-fix linting issues
-bun run format               # Format code with Biome
-bun run check                # Run both lint and format checks
-bun run check:fix            # Auto-fix all issues
-```
-
-### Git Hooks (Lefthook)
-
-This project uses [Lefthook](https://github.com/evilmartians/lefthook) for Git hooks. Hooks are automatically installed when you run `bun install`.
-
-**Pre-commit hook:**
-- Runs Biome check on staged files
-- Auto-fixes issues and stages the changes
-- Prevents commits with linting/formatting errors
-
-To skip hooks (not recommended):
-```bash
-git commit --no-verify
-```
-
-### CI/CD
-
-The project includes a GitHub Actions workflow that runs on every push and pull request:
-
-**Workflow: Test and lint** (`.github/workflows/test-and-lint.yml`)
-- Installs dependencies with Bun
-- Builds the project
-- Publishes preview packages with `pkg.pr.new`
-- Runs all tests
-- Runs linting checks
-
-The workflow ensures code quality and prevents broken builds from being merged.
-
-#### pkg.pr.new Setup
-
-This project uses [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) for continuous package previews. Each commit and PR automatically generates a preview release that can be installed without publishing to npm.
-
-**One-time setup required:**
-1. Install the [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new) on your repository
-2. Once installed, the workflow will automatically publish preview packages on every commit/PR
-
-**Using preview packages:**
-```bash
-# Install from a specific commit (Bun)
-bun add https://pkg.pr.new/OWNER/REPO/@samhoque/convex-component-template@COMMIT_SHA
-
-# Or with npm
-npm i https://pkg.pr.new/OWNER/REPO/@samhoque/convex-component-template@COMMIT_SHA
-```
-
-Preview URLs will be posted as comments on your pull requests automatically.
-
-## Component Architecture
-
-### 1. Component Definition
-
-The component is defined in `src/component/convex.config.ts`:
-
-```typescript
-import { defineComponent } from "convex/server";
-import { api } from "./_generated/api";
-
-const component = defineComponent("shardedCounter"); // Change "shardedCounter" to your component name
-component.export(api, { greet: api.lib.greet });
-export default component;
-```
-
-### 2. Package Exports
-
-The `package.json` exports the component using the `@convex-dev/component-source` condition:
-
-```json
-{
-  "exports": {
-    "./convex.config": {
-      "@convex-dev/component-source": "./src/component/convex.config.ts"
-    }
-  }
-}
-```
-
-This enables live reloading during development.
-
-### 3. Component Usage
-
-Apps import and mount the component in their `convex.config.ts`:
-
-```typescript
-import { defineApp } from "convex/server";
-import component from "@your-package/convex.config";
-
-const app = defineApp();
-app.use(component);
-export default app;
-```
-
-### 4. Client Library (Optional)
-
-The `src/client/` directory contains helper code that runs in the app (not the component):
-
-```typescript
-export class Counter {
-  constructor(
-    private component: UseApi<typeof api>,
-    private options?: { initialValue?: number }
-  ) {}
-
-  async count(ctx: RunQueryCtx) {
-    return await ctx.runQuery(this.component.public.count, {});
-  }
-}
-```
-
-This pattern is useful for:
-- Hiding implementation details
-- Managing implicit dependencies (auth, env vars)
-- Providing a cleaner API surface
-
-## Calling Component Functions
-
-### Subtransactions
-
-Components use **subtransactions** for cross-component function calls:
-
-```typescript
-// From the app or parent component
-const count = await ctx.runQuery(components.counter.public.count, args);
-const newCount = await ctx.runMutation(components.counter.public.increment, args);
-```
-
-**Key semantics:**
-1. Sub-queries track reads for reactivity across components
-2. Sub-mutations contribute to the parent's ACID transaction
-3. Sub-mutations are isolated from each other (even with `Promise.all`)
-4. Parent errors roll back sub-mutations
-5. Sub-mutation errors can be caught without affecting parent
-
-### Exposing Component Functions Publicly
-
-Components cannot be called directly from clients. The app must wrap them:
-
-```typescript
-// in the app's convex/counter.ts
-export const count = query({
-  handler: async (ctx) => {
-    return await ctx.runQuery(components.counter.public.count, {});
-  },
-});
-```
-
-This allows the app to add auth, rate limiting, etc.
-
-## Working with Isolation
-
-### Function Access Hierarchy
-
-```mermaid
-flowchart TD
-    A[Public Internet / React] --> B[App]
-    B --> C[Component1]
-    B --> D[Component2]
-    C --> E[Component3]
-```
-
-- Clients can only call app functions (not component functions)
-- Apps can call their own functions and component public functions
-- Components can only call their own functions and child component public functions
-
-### Function Handles
-
-To allow components to call back into the app, use function handles:
-
-```typescript
-// In the app
-const handle = await createFunctionHandle(api.myMutation);
-
-// Pass handle to component
-await ctx.runMutation(components.worker.public.process, { handler: handle });
-
-// In the component
-export const process = mutation({
-  args: { handler: v.string() },
-  handler: async (ctx, args) => {
-    // Component can now call the app's function
-    const functionHandle: FunctionHandle<"mutation"> = args.handler;
-    await ctx.runMutation(functionHandle, {});
-  },
-});
-```
-
-**Use cases:**
-- Migrations component iterating over app tables
-- Webhook handlers calling app logic
-- Background job processors
-
-### Table Access
-
-Components have **isolated tables**:
-- Components can only read/write their own tables
-- Use `v.id("tableName")` for component tables
-- Use `v.string()` for IDs from other components/app
-- Use function handles to grant table access across boundaries
-
-### Environment Variables and Auth
-
-Components **cannot access** `process.env` or `ctx.auth` directly. Pass them through:
-
-```typescript
-// src/client/index.ts (runs in app context)
-class MyComponent {
-  constructor(
-    private component: UseApi<typeof api>,
-    private options?: { apiKey?: string }
-  ) {
-    this.apiKey = options?.apiKey ?? process.env.MY_API_KEY;
-  }
-
-  async doSomething(ctx: QueryCtx) {
-    return await ctx.runQuery(this.component.public.process, {
-      apiKey: this.apiKey,
-      auth: await ctx.auth.getUserIdentity(),
-    });
-  }
-}
-```
-
-### HTTP Actions
-
-Components cannot define HTTP routes directly. Instead, they export handlers that the app mounts:
-
-```typescript
-// src/client/index.ts
-export const httpHandler = httpAction(async (ctx, request) => {
-  // Handle HTTP request
-});
-
-// In app's convex/http.ts
-import { httpRouter } from "convex/server";
-import { httpHandler } from "@your-component/client";
-
-const http = httpRouter();
-http.route({ path: "/webhook", method: "POST", handler: httpHandler });
-export default http;
-```
-
-### Pagination
-
-The built-in `.paginate()` doesn't work in components. Use [`convex-helpers` paginator](https://github.com/get-convex/convex-helpers) instead:
-
-```typescript
-import { paginationOptsValidator } from "convex-helpers/server/pagination";
-import { makePagination } from "convex-helpers/server/pagination";
-
-export const listItems = query({
-  args: { paginationOpts: paginationOptsValidator },
-  handler: async (ctx, args) => {
-    return await makePagination(ctx.db.query("items"), args.paginationOpts);
-  },
-});
-```
-
-## Testing Pattern
-
-This template uses `convex-test` with Bun's test runner. Tests are **separate from component source** to prevent bundling issues.
-
-### Test Setup (`test/component/setup.test.ts`)
-
-Auto-discovers component files and creates a test helper:
-
-```typescript
-import { convexTest as baseConvexTest } from "convex-test";
-import { Glob } from "bun";
-
-const glob = new Glob("**/*.ts");
-const modules: Record<string, string> = {};
-
-for await (const file of glob.scan("./src/component")) {
-  if (!file.startsWith("_generated/")) {
-    modules[file.replace(/\.ts$/, ".js")] = await Bun.file(
-      `./src/component/${file}`
-    ).text();
-  }
-}
-
-export const convexTest = () => baseConvexTest(schema, modules);
-```
-
-### Writing Tests
-
-```typescript
-import { test, expect } from "bun:test";
-import { api } from "../../src/component/_generated/api";
-import { convexTest } from "./setup.test";
-
-test("greet returns greeting", async () => {
-  const t = convexTest();
-  const result = await t.query(api.lib.greet, { name: "Alice" });
-  expect(result).toBe("Hello, Alice!");
-});
-
-test("with authentication", async () => {
-  const t = convexTest();
-  const asUser = t.withIdentity({ subject: "user123" });
-  const result = await asUser.query(api.lib.getCurrentUser, {});
-  expect(result.subject).toBe("user123");
-});
-```
-
-## Distribution
-
-### Local Development
-
-To use the component in another app during development:
-
-```bash
-bun run build
-bun pack  # or npm pack
-```
-
-Then in the other app:
-```bash
-bun install ../path/to/component/your-component-0.1.0.tgz
-```
-
-### Publishing
-
-This package is currently marked as `private` in package.json. To publish to npm:
-
-1. Remove `"private": true` from package.json
-2. Run: `bun publish` (or `npm publish` if bun publish is not yet available)
-
-## Dashboard and Deployment
-
-### Component Visibility
-
-In the Convex dashboard, you can select each component to see:
-- Data tables
-- Functions
-- File storage
-- Logs
-- Scheduled functions
-
-### Deployment Semantics
-
-1. **Function calls**: Top-level query/mutation counts as single function call (sub-calls are free)
-2. **Database bandwidth**: Component functions count bandwidth separately
-3. **Logging**: Component logs appear in dashboard and log streams
-4. **Exports**: Snapshot exports include all component data
-5. **Streaming exports**: Only include top-level app data (not components)
-
-## Code Style
-
-- **Package manager**: Bun
-- **Linter/Formatter**: Biome
-- **Indentation**: Tabs
-- **Quotes**: Double quotes
-- **TypeScript**: Strict mode with extra checks
-
-## Examples
-
-### First-Party Components
-
-All first-party components are open source:
-
-- [sharded-counter](https://github.com/get-convex/sharded-counter) - Attaching components to app tables with triggers
-- [twilio](https://github.com/get-convex/twilio) - HTTP actions and webhooks
-- [aggregate](https://github.com/get-convex/aggregate) - Testing patterns
-- [migrations](https://github.com/get-convex/migrations) - Function handles and table access
-
-## Important Notes
-
-- **Generated files**: Never edit `_generated/` directories
-- **Test location**: Always place tests in `test/component/` (not `src/component/`)
-- **Component name**: Change `"shardedCounter"` in convex.config.ts to your component name
-- **Live reloading**: Enabled via `--live-component-sources` flag
-- **Peer dependencies**: Component uses the app's Convex installation
-
-## Resources
-
-- [Convex Components Documentation](https://www.convex.dev/components)
-- [Component Authoring Guide](https://docs.convex.dev/components/authoring)
-- [convex-test](https://github.com/get-convex/convex-test)
-- [convex-helpers](https://github.com/get-convex/convex-helpers)
-- [Bun Documentation](https://bun.sh/docs)
+## API Coverage
+
+This component implements the following Loops.so API endpoints:
+
+- ✅ Create/Update Contact
+- ✅ Delete Contact
+- ✅ Find Contact
+- ✅ Batch Create Contacts
+- ✅ Unsubscribe/Resubscribe Contact
+- ✅ Count Contacts (custom implementation)
+- ✅ Send Transactional Email
+- ✅ Send Event
+- ✅ Trigger Loop
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
 
 ## License
 
-MIT
+Apache-2.0
+
+## Resources
+
+- [Loops.so Documentation](https://loops.so/docs)
+- [Convex Components Documentation](https://www.convex.dev/components)
+- [Convex Environment Variables](https://docs.convex.dev/production/environment-variables)

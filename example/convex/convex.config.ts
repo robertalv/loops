@@ -1,4 +1,4 @@
-import component from "@samhoque/convex-component-template/convex.config";
+import component from "devwithbobby/loops/convex.config";
 import { defineApp } from "convex/server";
 
 const app = defineApp();

@@ -8,8 +8,6 @@ import type {
 } from "convex/server";
 import type { GenericId } from "convex/values";
 
-// Type utils follow
-
 export type RunQueryCtx = {
 	runQuery: <Query extends FunctionReference<"query", "internal">>(
 		query: Query,
