@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { za, zm, zq } from "../utils.js";
 import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel.js";
 import { contactValidator } from "./validators.js";
 
 const LOOPS_API_BASE_URL = "https://app.loops.so/api/v1";
@@ -144,7 +145,7 @@ export const countContacts = zq({
 	}),
 	returns: z.number(),
 	handler: async (ctx, args) => {
-		let contacts: Array<{ _id: any }>;
+		let contacts: Doc<"contacts">[];
 		if (args.userGroup !== undefined) {
 			contacts = await ctx.db
 				.query("contacts")
@@ -213,7 +214,7 @@ export const listContacts = zq({
 		hasMore: z.boolean(),
 	}),
 	handler: async (ctx, args) => {
-		let allContacts: Array<{ _id: any }>;
+		let allContacts: Doc<"contacts">[];
 
 		// Get all contacts matching the filters
 		if (args.userGroup !== undefined) {
@@ -250,10 +251,12 @@ export const listContacts = zq({
 		allContacts.sort((a, b) => b.createdAt - a.createdAt);
 
 		const total = allContacts.length;
-		const paginatedContacts = allContacts.slice(
-			args.offset,
-			args.offset + args.limit,
-		);
+		const paginatedContacts = allContacts
+			.slice(args.offset, args.offset + args.limit)
+			.map((contact) => ({
+				...contact,
+				subscribed: contact.subscribed ?? true, // Ensure subscribed is always boolean
+			}));
 		const hasMore = args.offset + args.limit < total;
 
 		return {
