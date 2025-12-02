@@ -3,12 +3,21 @@ import {
 	type ContactPayload,
 	type DeleteContactPayload,
 	type EventPayload,
-	type HeadersInitParam,
 	internalLib,
 	type TransactionalPayload,
 	type TriggerPayload,
 	type UpdateContactPayload,
 } from "../types";
+import {
+	buildCorsHeaders,
+	jsonResponse,
+	emptyResponse,
+	readJsonBody,
+	respondError,
+	booleanFromQuery,
+	numberFromQuery,
+	requireLoopsApiKey,
+} from "./helpers";
 import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
@@ -16,80 +25,6 @@ const http = httpRouter();
 const allowedOrigin =
 	process.env.LOOPS_HTTP_ALLOWED_ORIGIN ?? process.env.CLIENT_ORIGIN ?? "*";
 
-const buildCorsHeaders = (extra?: HeadersInitParam) => {
-	const headers = new Headers(extra ?? {});
-	headers.set("Access-Control-Allow-Origin", allowedOrigin);
-	headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-	headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-	headers.set("Access-Control-Max-Age", "86400");
-	headers.set("Vary", "Origin");
-	return headers;
-};
-
-const jsonResponse = (data: unknown, init?: ResponseInit) => {
-	const headers = buildCorsHeaders(
-		(init?.headers as HeadersInitParam | undefined) ?? undefined,
-	);
-	headers.set("Content-Type", "application/json");
-	return new Response(JSON.stringify(data), { ...init, headers });
-};
-
-const emptyResponse = (init?: ResponseInit) => {
-	const headers = buildCorsHeaders(
-		(init?.headers as HeadersInitParam | undefined) ?? undefined,
-	);
-	return new Response(null, { ...init, headers });
-};
-
-const readJsonBody = async <T>(request: Request): Promise<T> => {
-	try {
-		return (await request.json()) as T;
-	} catch (_error) {
-		throw new Error("Invalid JSON body");
-	}
-};
-
-const booleanFromQuery = (value: string | null) => {
-	if (value === null) {
-		return undefined;
-	}
-	if (value === "true") {
-		return true;
-	}
-	if (value === "false") {
-		return false;
-	}
-	return undefined;
-};
-
-const numberFromQuery = (value: string | null, fallback: number) => {
-	if (!value) {
-		return fallback;
-	}
-	const parsed = Number.parseInt(value, 10);
-	return Number.isNaN(parsed) ? fallback : parsed;
-};
-
-const requireLoopsApiKey = () => {
-	const apiKey = process.env.LOOPS_API_KEY;
-	if (!apiKey) {
-		throw new Error(
-			"LOOPS_API_KEY environment variable must be set to use the HTTP API.",
-		);
-	}
-	return apiKey;
-};
-
-const respondError = (error: unknown) => {
-	console.error("[loops:http]", error);
-	const message = error instanceof Error ? error.message : "Unexpected error";
-	const status =
-		error instanceof Error &&
-		error.message.includes("LOOPS_API_KEY environment variable")
-			? 500
-			: 400;
-	return jsonResponse({ error: message }, { status });
-};
 
 http.route({
 	pathPrefix: "/loops",
