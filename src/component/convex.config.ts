@@ -1,8 +1,13 @@
 import { defineComponent } from "convex/server";
-import { api } from "./_generated/api.js";
+import { api } from "./_generated/api";
 
 const component = defineComponent("loops");
-(component as any).export(api, {
+
+type ExportableComponent = typeof component & {
+	export: (apiRef: typeof api, functions: Record<string, unknown>) => void;
+};
+
+(component as ExportableComponent).export(api, {
 	addContact: api.lib.addContact,
 	updateContact: api.lib.updateContact,
 	findContact: api.lib.findContact,

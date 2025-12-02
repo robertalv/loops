@@ -27,17 +27,9 @@ import type {
 declare const fullApi: ApiFromModules<{
   lib: typeof lib;
 }>;
-export type Mounts = {
-  lib: {
-    add: FunctionReference<
-      "mutation",
-      "public",
-      { count: number; name: string; shards?: number },
-      null
-    >;
-    count: FunctionReference<"query", "public", { name: string }, number>;
-  };
-};
+export type Mounts = ApiFromModules<{
+  lib: typeof lib;
+}>;
 // For now fullApiWithMounts is only fullApi which provides
 // jump-to-definition in component client code.
 // Use Mounts for the same type without the inference.

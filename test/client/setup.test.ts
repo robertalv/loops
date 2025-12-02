@@ -8,7 +8,7 @@ import {
 	type SchemaDefinition,
 } from "convex/server";
 import { convexTest } from "convex-test";
-import type { LoopsComponentComponent } from "../../src/client/index.js";
+import type { LoopsComponent } from "../../src/client/index";
 import componentSchema from "../../src/component/schema.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -48,7 +48,7 @@ export function initConvexTest<
 }
 
 export const components = componentsGeneric() as unknown as {
-	loops: LoopsComponentComponent;
+	loops: LoopsComponent;
 };
 
 test("setup", () => {});

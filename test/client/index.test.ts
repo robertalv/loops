@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { defineSchema } from "convex/server";
 import { Loops } from "../../src/client";
-import { components } from "./setup.test.js";
+import { components } from "./setup.test";
 
 // The schema for the tests
 const _schema = defineSchema({});

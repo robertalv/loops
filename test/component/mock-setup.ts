@@ -40,90 +40,96 @@ function createMockResponse(
 export function setupMockFetch() {
 	const originalFetch = globalThis.fetch;
 
-	globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-		const url =
-			typeof input === "string"
-				? input
-				: input instanceof URL
-					? input.href
-					: input.url;
+	const mockFetch = Object.assign(
+		async (input: RequestInfo | URL, init?: RequestInit) => {
+			const url =
+				typeof input === "string"
+					? input
+					: input instanceof URL
+						? input.href
+						: input.url;
 
-		// Only mock Loops API calls
-		if (!url.startsWith(LOOPS_API_BASE_URL)) {
-			return originalFetch(input, init);
-		}
+			// Only mock Loops API calls
+			if (!url.startsWith(LOOPS_API_BASE_URL)) {
+				return originalFetch(input, init);
+			}
 
-		// Check if we have a custom mock response template
-		if (mockResponses.has(url)) {
-			// Clone the template to create a new instance
-			const template = mockResponses.get(url)!;
-			const cloned = template.clone();
-			return cloned;
-		}
+			// Check if we have a custom mock response template
+			if (mockResponses.has(url)) {
+				// Clone the template to create a new instance
+				const template = mockResponses.get(url);
+				if (template) {
+					return template.clone();
+				}
+			}
 
-		// Default mock responses based on endpoint (create new instance each time)
-		if (url.includes("/contacts/create")) {
-			const _body = init?.body ? JSON.parse(init.body as string) : {};
-			// Create fresh response each time to avoid "Body already used" errors
-			return createMockResponse(200, {
-				id: `contact_${Date.now()}_${Math.random()}`,
-				success: true,
-			});
-		}
+			// Default mock responses based on endpoint (create new instance each time)
+			if (url.includes("/contacts/create")) {
+				const _body = init?.body ? JSON.parse(init.body as string) : {};
+				// Create fresh response each time to avoid "Body already used" errors
+				return createMockResponse(200, {
+					id: `contact_${Date.now()}_${Math.random()}`,
+					success: true,
+				});
+			}
 
-		if (url.includes("/contacts/update")) {
-			return createMockResponse(200, {
-				success: true,
-			});
-		}
+			if (url.includes("/contacts/update")) {
+				return createMockResponse(200, {
+					success: true,
+				});
+			}
 
-		if (url.includes("/contacts/delete")) {
-			return createMockResponse(200, {
-				success: true,
-			});
-		}
+			if (url.includes("/contacts/delete")) {
+				return createMockResponse(200, {
+					success: true,
+				});
+			}
 
-		if (url.includes("/contacts/find")) {
-			const urlObj = new URL(url);
-			const email = urlObj.searchParams.get("email") || "";
-			// Create fresh response each time
-			return createMockResponse(200, {
-				id: `contact_${email}`,
-				email,
-				firstName: "Test",
-				lastName: "User",
-				subscribed: true,
-			});
-		}
+			if (url.includes("/contacts/find")) {
+				const urlObj = new URL(url);
+				const email = urlObj.searchParams.get("email") || "";
+				// Create fresh response each time
+				return createMockResponse(200, {
+					id: `contact_${email}`,
+					email,
+					firstName: "Test",
+					lastName: "User",
+					subscribed: true,
+				});
+			}
 
-		if (url.includes("/contacts/unsubscribe")) {
-			return createMockResponse(200, {
-				success: true,
-			});
-		}
+			if (url.includes("/contacts/unsubscribe")) {
+				return createMockResponse(200, {
+					success: true,
+				});
+			}
 
-		if (url.includes("/contacts/resubscribe")) {
-			return createMockResponse(200, {
-				success: true,
-			});
-		}
+			if (url.includes("/contacts/resubscribe")) {
+				return createMockResponse(200, {
+					success: true,
+				});
+			}
 
-		if (url.includes("/transactional")) {
-			return createMockResponse(200, {
-				id: `transactional_${Date.now()}`,
-				success: true,
-			});
-		}
+			if (url.includes("/transactional")) {
+				return createMockResponse(200, {
+					id: `transactional_${Date.now()}`,
+					success: true,
+				});
+			}
 
-		if (url.includes("/events/send")) {
-			return createMockResponse(200, {
-				success: true,
-			});
-		}
+			if (url.includes("/events/send")) {
+				return createMockResponse(200, {
+					success: true,
+				});
+			}
 
-		// Default 200 response
-		return createMockResponse(200, { success: true });
-	};
+			// Default 200 response
+			return createMockResponse(200, { success: true });
+		},
+		originalFetch,
+	) as typeof fetch;
+
+	globalThis.fetch = mockFetch;
 
 	return () => {
 		globalThis.fetch = originalFetch;

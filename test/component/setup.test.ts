@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { convexTest as convexT } from "convex-test";
-import schema from "../../src/component/schema.ts";
+import schema from "../../src/component/schema";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const componentDir = join(__dirname, "../../src/component");

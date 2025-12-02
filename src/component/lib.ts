@@ -1,29 +1,9 @@
 import { z } from "zod";
+import { internalLib } from "../types";
 import { za, zm, zq } from "../utils.js";
-import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel.js";
+import { loopsFetch, sanitizeLoopsError } from "./helpers";
 import { contactValidator } from "./validators.js";
-
-const LOOPS_API_BASE_URL = "https://app.loops.so/api/v1";
-
-/**
- * Sanitize error messages to avoid leaking sensitive information
- */
-const sanitizeError = (status: number, _errorText: string): Error => {
-	if (status === 401 || status === 403) {
-		return new Error("Authentication failed. Please check your API key.");
-	}
-	if (status === 404) {
-		return new Error("Resource not found.");
-	}
-	if (status === 429) {
-		return new Error("Rate limit exceeded. Please try again later.");
-	}
-	if (status >= 500) {
-		return new Error("Loops service error. Please try again later.");
-	}
-	return new Error(`Loops API error (${status}). Please try again.`);
-};
 
 /**
  * Internal mutation to store/update a contact in the database
@@ -113,23 +93,24 @@ export const logEmailOperation = zm({
 	}),
 	returns: z.void(),
 	handler: async (ctx, args) => {
-		const operationData: Record<string, any> = {
+		const operationData: Omit<
+			Doc<"emailOperations">,
+			"_id" | "_creationTime"
+		> = {
 			operationType: args.operationType,
 			email: args.email,
 			timestamp: Date.now(),
 			success: args.success,
+			actorId: args.actorId,
+			transactionalId: args.transactionalId,
+			campaignId: args.campaignId,
+			loopId: args.loopId,
+			eventName: args.eventName,
+			messageId: args.messageId,
+			metadata: args.metadata,
 		};
 
-		if (args.actorId) operationData.actorId = args.actorId;
-		if (args.transactionalId)
-			operationData.transactionalId = args.transactionalId;
-		if (args.campaignId) operationData.campaignId = args.campaignId;
-		if (args.loopId) operationData.loopId = args.loopId;
-		if (args.eventName) operationData.eventName = args.eventName;
-		if (args.messageId) operationData.messageId = args.messageId;
-		if (args.metadata) operationData.metadata = args.metadata;
-
-		await ctx.db.insert("emailOperations", operationData as any);
+		await ctx.db.insert("emailOperations", operationData);
 	},
 });
 
@@ -284,32 +265,23 @@ export const addContact = za({
 		id: z.string().optional(),
 	}),
 	handler: async (ctx, args) => {
-		const response = await fetch(`${LOOPS_API_BASE_URL}/contacts/create`, {
+		const createResponse = await loopsFetch(args.apiKey, "/contacts/create", {
 			method: "POST",
-			headers: {
-				Authorization: `Bearer ${args.apiKey}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify(args.contact),
+			json: args.contact,
 		});
 
-		if (!response.ok) {
-			const errorText = await response.text();
+		if (!createResponse.ok) {
+			const errorText = await createResponse.text();
 
-			if (response.status === 409) {
+			if (createResponse.status === 409) {
 				console.log(
 					`Contact ${args.contact.email} already exists, updating instead`,
 				);
 
-				const findResponse = await fetch(
-					`${LOOPS_API_BASE_URL}/contacts/find?email=${encodeURIComponent(args.contact.email)}`,
-					{
-						method: "GET",
-						headers: {
-							Authorization: `Bearer ${args.apiKey}`,
-							"Content-Type": "application/json",
-						},
-					},
+				const findResponse = await loopsFetch(
+					args.apiKey,
+					`/contacts/find?email=${encodeURIComponent(args.contact.email)}`,
+					{ method: "GET" },
 				);
 
 				if (!findResponse.ok) {
@@ -320,15 +292,12 @@ export const addContact = za({
 					);
 				}
 
-				const updateResponse = await fetch(
-					`${LOOPS_API_BASE_URL}/contacts/update`,
+				const updateResponse = await loopsFetch(
+					args.apiKey,
+					"/contacts/update",
 					{
 						method: "PUT",
-						headers: {
-							Authorization: `Bearer ${args.apiKey}`,
-							"Content-Type": "application/json",
-						},
-						body: JSON.stringify({
+						json: {
 							email: args.contact.email,
 							firstName: args.contact.firstName,
 							lastName: args.contact.lastName,
@@ -336,7 +305,7 @@ export const addContact = za({
 							source: args.contact.source,
 							subscribed: args.contact.subscribed,
 							userGroup: args.contact.userGroup,
-						}),
+						},
 					},
 				);
 
@@ -346,7 +315,7 @@ export const addContact = za({
 						`Loops API error [${updateResponse.status}]:`,
 						updateErrorText,
 					);
-					throw sanitizeError(updateResponse.status, updateErrorText);
+					throw sanitizeLoopsError(updateResponse.status, updateErrorText);
 				}
 
 				// Get contact ID if available
@@ -357,7 +326,7 @@ export const addContact = za({
 				}
 
 				// Store/update in our database
-				await ctx.runMutation((internal as any).lib.storeContact as any, {
+				await ctx.runMutation(internalLib.storeContact, {
 					email: args.contact.email,
 					firstName: args.contact.firstName,
 					lastName: args.contact.lastName,
@@ -374,15 +343,14 @@ export const addContact = za({
 				};
 			}
 
-			// For other errors, throw as normal
-			console.error(`Loops API error [${response.status}]:`, errorText);
-			throw sanitizeError(response.status, errorText);
+			console.error(`Loops API error [${createResponse.status}]:`, errorText);
+			throw sanitizeLoopsError(createResponse.status, errorText);
 		}
 
 		// Contact was created successfully
-		const data = (await response.json()) as { id?: string };
+		const data = (await createResponse.json()) as { id?: string };
 
-		await ctx.runMutation((internal as any).lib.storeContact as any, {
+		await ctx.runMutation(internalLib.storeContact, {
 			email: args.contact.email,
 			firstName: args.contact.firstName,
 			lastName: args.contact.lastName,
@@ -419,13 +387,9 @@ export const updateContact = za({
 		success: z.boolean(),
 	}),
 	handler: async (ctx, args) => {
-		const response = await fetch(`${LOOPS_API_BASE_URL}/contacts/update`, {
+		const response = await loopsFetch(args.apiKey, "/contacts/update", {
 			method: "PUT",
-			headers: {
-				Authorization: `Bearer ${args.apiKey}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
+			json: {
 				email: args.email,
 				dataVariables: args.dataVariables,
 				firstName: args.firstName,
@@ -434,16 +398,16 @@ export const updateContact = za({
 				source: args.source,
 				subscribed: args.subscribed,
 				userGroup: args.userGroup,
-			}),
+			},
 		});
 
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error(`Loops API error [${response.status}]:`, errorText);
-			throw sanitizeError(response.status, errorText);
+			throw sanitizeLoopsError(response.status, errorText);
 		}
 
-		await ctx.runMutation((internal as any).lib.storeContact as any, {
+		await ctx.runMutation(internalLib.storeContact, {
 			email: args.email,
 			firstName: args.firstName,
 			lastName: args.lastName,
@@ -472,35 +436,31 @@ export const sendTransactional = za({
 		messageId: z.string().optional(),
 	}),
 	handler: async (ctx, args) => {
-		const response = await fetch(`${LOOPS_API_BASE_URL}/transactional`, {
+		const response = await loopsFetch(args.apiKey, "/transactional", {
 			method: "POST",
-			headers: {
-				Authorization: `Bearer ${args.apiKey}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
+			json: {
 				transactionalId: args.transactionalId,
 				email: args.email,
 				dataVariables: args.dataVariables,
-			}),
+			},
 		});
 
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error(`Loops API error [${response.status}]:`, errorText);
-			await ctx.runMutation((internal as any).lib.logEmailOperation as any, {
+			await ctx.runMutation(internalLib.logEmailOperation, {
 				operationType: "transactional",
 				email: args.email,
 				success: false,
 				transactionalId: args.transactionalId,
 			});
 
-			throw sanitizeError(response.status, errorText);
+			throw sanitizeLoopsError(response.status, errorText);
 		}
 
 		const data = (await response.json()) as { messageId?: string };
 
-		await ctx.runMutation((internal as any).lib.logEmailOperation as any, {
+		await ctx.runMutation(internalLib.logEmailOperation, {
 			operationType: "transactional",
 			email: args.email,
 			success: true,
@@ -529,23 +489,19 @@ export const sendEvent = za({
 		success: z.boolean(),
 	}),
 	handler: async (_ctx, args) => {
-		const response = await fetch(`${LOOPS_API_BASE_URL}/events/send`, {
+		const response = await loopsFetch(args.apiKey, "/events/send", {
 			method: "POST",
-			headers: {
-				Authorization: `Bearer ${args.apiKey}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
+			json: {
 				email: args.email,
 				eventName: args.eventName,
 				eventProperties: args.eventProperties,
-			}),
+			},
 		});
 
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error(`Loops API error [${response.status}]:`, errorText);
-			throw sanitizeError(response.status, errorText);
+			throw sanitizeLoopsError(response.status, errorText);
 		}
 
 		return { success: true };
@@ -564,22 +520,18 @@ export const deleteContact = za({
 		success: z.boolean(),
 	}),
 	handler: async (ctx, args) => {
-		const response = await fetch(`${LOOPS_API_BASE_URL}/contacts/delete`, {
+		const response = await loopsFetch(args.apiKey, "/contacts/delete", {
 			method: "POST",
-			headers: {
-				Authorization: `Bearer ${args.apiKey}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({ email: args.email }),
+			json: { email: args.email },
 		});
 
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error(`Loops API error [${response.status}]:`, errorText);
-			throw sanitizeError(response.status, errorText);
+			throw sanitizeLoopsError(response.status, errorText);
 		}
 
-		await ctx.runMutation((internal as any).lib.removeContact as any, {
+		await ctx.runMutation(internalLib.removeContact, {
 			email: args.email,
 		});
 
@@ -623,7 +575,7 @@ export const triggerLoop = za({
 
 		try {
 			// Send event to trigger the loop
-			await ctx.runAction((internal as any).lib.sendEvent as any, {
+			await ctx.runAction(internalLib.sendEvent, {
 				apiKey: args.apiKey,
 				email: args.email,
 				eventName,
@@ -634,7 +586,7 @@ export const triggerLoop = za({
 			});
 
 			// Log as loop operation
-			await ctx.runMutation((internal as any).lib.logEmailOperation as any, {
+			await ctx.runMutation(internalLib.logEmailOperation, {
 				operationType: "loop",
 				email: args.email,
 				success: true,
@@ -649,7 +601,7 @@ export const triggerLoop = za({
 			};
 		} catch (error) {
 			// Log failed loop operation
-			await ctx.runMutation((internal as any).lib.logEmailOperation as any, {
+			await ctx.runMutation(internalLib.logEmailOperation, {
 				operationType: "loop",
 				email: args.email,
 				success: false,
@@ -692,15 +644,10 @@ export const findContact = za({
 			.optional(),
 	}),
 	handler: async (_ctx, args) => {
-		const response = await fetch(
-			`${LOOPS_API_BASE_URL}/contacts/find?email=${encodeURIComponent(args.email)}`,
-			{
-				method: "GET",
-				headers: {
-					Authorization: `Bearer ${args.apiKey}`,
-					"Content-Type": "application/json",
-				},
-			},
+		const response = await loopsFetch(
+			args.apiKey,
+			`/contacts/find?email=${encodeURIComponent(args.email)}`,
+			{ method: "GET" },
 		);
 
 		if (!response.ok) {
@@ -709,12 +656,13 @@ export const findContact = za({
 			}
 			const errorText = await response.text();
 			console.error(`Loops API error [${response.status}]:`, errorText);
-			throw sanitizeError(response.status, errorText);
+			throw sanitizeLoopsError(response.status, errorText);
 		}
 
+		type LoopsContactRecord = Record<string, unknown>;
 		const data = (await response.json()) as
-			| Record<string, any>
-			| Array<Record<string, any>>;
+			| LoopsContactRecord
+			| Array<LoopsContactRecord>;
 
 		// Handle case where Loops returns an array instead of a single object
 		let contact = Array.isArray(data) ? data[0] : data;
@@ -726,12 +674,12 @@ export const findContact = za({
 					key,
 					value === null ? undefined : value,
 				]),
-			) as Record<string, any>;
+			) as LoopsContactRecord;
 		}
 
 		return {
 			success: true,
-			contact: contact as Record<string, any> | undefined,
+			contact: contact as LoopsContactRecord | undefined,
 		};
 	},
 });
@@ -770,13 +718,10 @@ export const batchCreateContacts = za({
 		for (const contact of args.contacts) {
 			try {
 				// Use the addContact function which handles create/update logic
-				const result = await ctx.runAction(
-					(internal as any).lib.addContact as any,
-					{
-						apiKey: args.apiKey,
-						contact,
-					},
-				);
+				const result = await ctx.runAction(internalLib.addContact, {
+					apiKey: args.apiKey,
+					contact,
+				});
 
 				if (result.success) {
 					created++;
@@ -821,22 +766,18 @@ export const unsubscribeContact = za({
 		success: z.boolean(),
 	}),
 	handler: async (ctx, args) => {
-		const response = await fetch(`${LOOPS_API_BASE_URL}/contacts/unsubscribe`, {
+		const response = await loopsFetch(args.apiKey, "/contacts/unsubscribe", {
 			method: "POST",
-			headers: {
-				Authorization: `Bearer ${args.apiKey}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({ email: args.email }),
+			json: { email: args.email },
 		});
 
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error(`Loops API error [${response.status}]:`, errorText);
-			throw sanitizeError(response.status, errorText);
+			throw sanitizeLoopsError(response.status, errorText);
 		}
 
-		await ctx.runMutation((internal as any).lib.storeContact as any, {
+		await ctx.runMutation(internalLib.storeContact, {
 			email: args.email,
 			subscribed: false,
 		});
@@ -858,22 +799,18 @@ export const resubscribeContact = za({
 		success: z.boolean(),
 	}),
 	handler: async (ctx, args) => {
-		const response = await fetch(`${LOOPS_API_BASE_URL}/contacts/resubscribe`, {
+		const response = await loopsFetch(args.apiKey, "/contacts/resubscribe", {
 			method: "POST",
-			headers: {
-				Authorization: `Bearer ${args.apiKey}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({ email: args.email }),
+			json: { email: args.email },
 		});
 
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error(`Loops API error [${response.status}]:`, errorText);
-			throw sanitizeError(response.status, errorText);
+			throw sanitizeLoopsError(response.status, errorText);
 		}
 
-		await ctx.runMutation((internal as any).lib.storeContact as any, {
+		await ctx.runMutation(internalLib.storeContact, {
 			email: args.email,
 			subscribed: true,
 		});

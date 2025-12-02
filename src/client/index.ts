@@ -1,7 +1,7 @@
 import { actionGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
-import type { Mounts } from "../component/_generated/api.js";
-import type { RunActionCtx, RunQueryCtx, UseApi } from "./types.js";
+import type { Mounts } from "../component/_generated/api";
+import type { RunActionCtx, RunQueryCtx, UseApi } from "../types";
 
 export type LoopsComponent = UseApi<Mounts>;
 
@@ -18,20 +18,20 @@ export interface ContactData {
 export interface TransactionalEmailOptions {
 	transactionalId: string;
 	email: string;
-	dataVariables?: Record<string, any>;
+	dataVariables?: Record<string, unknown>;
 }
 
 export interface EventOptions {
 	email: string;
 	eventName: string;
-	eventProperties?: Record<string, any>;
+	eventProperties?: Record<string, unknown>;
 }
 
 export class Loops {
-	private readonly component: LoopsComponent;
 	public readonly options?: {
 		apiKey?: string;
 	};
+	private readonly lib: NonNullable<LoopsComponent["lib"]>;
 
 	constructor(
 		component: LoopsComponent,
@@ -56,7 +56,7 @@ export class Loops {
 			);
 		}
 
-		this.component = component;
+		this.lib = component.lib;
 		this.options = options;
 
 		const apiKey = options?.apiKey ?? process.env.LOOPS_API_KEY;
@@ -83,22 +83,7 @@ export class Loops {
 	 * Add or update a contact in Loops
 	 */
 	async addContact(ctx: RunActionCtx, contact: ContactData) {
-		if (!this.component) {
-			throw new Error(
-				"Loops component is not initialized. " +
-					"Make sure to pass components.loops to the Loops constructor: " +
-					"new Loops(components.loops)",
-			);
-		}
-		if (!this.component.lib) {
-			throw new Error(
-				"Invalid component reference. " +
-					"The component may not be properly mounted. " +
-					"Ensure the component is correctly mounted in convex.config.ts: " +
-					"app.use(loops);",
-			);
-		}
-		return ctx.runAction((this.component.lib as any).addContact, {
+		return ctx.runAction(this.lib.addContact, {
 			apiKey: this.apiKey,
 			contact,
 		});
@@ -111,10 +96,10 @@ export class Loops {
 		ctx: RunActionCtx,
 		email: string,
 		updates: Partial<ContactData> & {
-			dataVariables?: Record<string, any>;
+			dataVariables?: Record<string, unknown>;
 		},
 	) {
-		return ctx.runAction((this.component.lib as any).updateContact, {
+		return ctx.runAction(this.lib.updateContact, {
 			apiKey: this.apiKey,
 			email,
 			...updates,
@@ -128,7 +113,7 @@ export class Loops {
 		ctx: RunActionCtx,
 		options: TransactionalEmailOptions,
 	) {
-		return ctx.runAction((this.component.lib as any).sendTransactional, {
+		return ctx.runAction(this.lib.sendTransactional, {
 			apiKey: this.apiKey,
 			...options,
 		});
@@ -138,7 +123,7 @@ export class Loops {
 	 * Send an event to Loops to trigger email workflows
 	 */
 	async sendEvent(ctx: RunActionCtx, options: EventOptions) {
-		return ctx.runAction((this.component.lib as any).sendEvent, {
+		return ctx.runAction(this.lib.sendEvent, {
 			apiKey: this.apiKey,
 			...options,
 		});
@@ -149,7 +134,7 @@ export class Loops {
 	 * Retrieves contact information from Loops
 	 */
 	async findContact(ctx: RunActionCtx, email: string) {
-		return ctx.runAction((this.component.lib as any).findContact, {
+		return ctx.runAction(this.lib.findContact, {
 			apiKey: this.apiKey,
 			email,
 		});
@@ -160,7 +145,7 @@ export class Loops {
 	 * Create multiple contacts in a single API call
 	 */
 	async batchCreateContacts(ctx: RunActionCtx, contacts: ContactData[]) {
-		return ctx.runAction((this.component.lib as any).batchCreateContacts, {
+		return ctx.runAction(this.lib.batchCreateContacts, {
 			apiKey: this.apiKey,
 			contacts,
 		});
@@ -171,7 +156,7 @@ export class Loops {
 	 * Unsubscribes a contact from receiving emails (they remain in the system)
 	 */
 	async unsubscribeContact(ctx: RunActionCtx, email: string) {
-		return ctx.runAction((this.component.lib as any).unsubscribeContact, {
+		return ctx.runAction(this.lib.unsubscribeContact, {
 			apiKey: this.apiKey,
 			email,
 		});
@@ -182,7 +167,7 @@ export class Loops {
 	 * Resubscribes a previously unsubscribed contact
 	 */
 	async resubscribeContact(ctx: RunActionCtx, email: string) {
-		return ctx.runAction((this.component.lib as any).resubscribeContact, {
+		return ctx.runAction(this.lib.resubscribeContact, {
 			apiKey: this.apiKey,
 			email,
 		});
@@ -201,10 +186,7 @@ export class Loops {
 			subscribed?: boolean;
 		},
 	) {
-		return ctx.runQuery(
-			(this.component.lib as any).countContacts,
-			options ?? {},
-		);
+		return ctx.runQuery(this.lib.countContacts, options ?? {});
 	}
 
 	/**
@@ -222,7 +204,7 @@ export class Loops {
 			offset?: number;
 		},
 	) {
-		return ctx.runQuery((this.component.lib as any).listContacts, {
+		return ctx.runQuery(this.lib.listContacts, {
 			userGroup: options?.userGroup,
 			source: options?.source,
 			subscribed: options?.subscribed,
@@ -241,7 +223,7 @@ export class Loops {
 			maxEmailsPerRecipient?: number;
 		},
 	) {
-		return ctx.runQuery((this.component.lib as any).detectRecipientSpam, {
+		return ctx.runQuery(this.lib.detectRecipientSpam, {
 			timeWindowMs: options?.timeWindowMs ?? 3600000,
 			maxEmailsPerRecipient: options?.maxEmailsPerRecipient ?? 10,
 		});
@@ -257,7 +239,7 @@ export class Loops {
 			maxEmailsPerActor?: number;
 		},
 	) {
-		return ctx.runQuery((this.component.lib as any).detectActorSpam, {
+		return ctx.runQuery(this.lib.detectActorSpam, {
 			timeWindowMs: options?.timeWindowMs ?? 3600000,
 			maxEmailsPerActor: options?.maxEmailsPerActor ?? 100,
 		});
@@ -272,7 +254,7 @@ export class Loops {
 			timeWindowMs?: number;
 		},
 	) {
-		return ctx.runQuery((this.component.lib as any).getEmailStats, {
+		return ctx.runQuery(this.lib.getEmailStats, {
 			timeWindowMs: options?.timeWindowMs ?? 86400000,
 		});
 	}
@@ -287,7 +269,7 @@ export class Loops {
 			minEmailsInWindow?: number;
 		},
 	) {
-		return ctx.runQuery((this.component.lib as any).detectRapidFirePatterns, {
+		return ctx.runQuery(this.lib.detectRapidFirePatterns, {
 			timeWindowMs: options?.timeWindowMs ?? 60000,
 			minEmailsInWindow: options?.minEmailsInWindow ?? 5,
 		});
@@ -304,10 +286,7 @@ export class Loops {
 			maxEmails: number;
 		},
 	) {
-		return ctx.runQuery(
-			(this.component.lib as any).checkRecipientRateLimit,
-			options,
-		);
+		return ctx.runQuery(this.lib.checkRecipientRateLimit, options);
 	}
 
 	/**
@@ -321,10 +300,7 @@ export class Loops {
 			maxEmails: number;
 		},
 	) {
-		return ctx.runQuery(
-			(this.component.lib as any).checkActorRateLimit,
-			options,
-		);
+		return ctx.runQuery(this.lib.checkActorRateLimit, options);
 	}
 
 	/**
@@ -337,17 +313,14 @@ export class Loops {
 			maxEmails: number;
 		},
 	) {
-		return ctx.runQuery(
-			(this.component.lib as any).checkGlobalRateLimit,
-			options,
-		);
+		return ctx.runQuery(this.lib.checkGlobalRateLimit, options);
 	}
 
 	/**
 	 * Delete a contact from Loops
 	 */
 	async deleteContact(ctx: RunActionCtx, email: string) {
-		return ctx.runAction((this.component.lib as any).deleteContact, {
+		return ctx.runAction(this.lib.deleteContact, {
 			apiKey: this.apiKey,
 			email,
 		});
@@ -368,11 +341,11 @@ export class Loops {
 		options: {
 			loopId: string;
 			email: string;
-			dataVariables?: Record<string, any>;
+			dataVariables?: Record<string, unknown>;
 			eventName?: string; // Event name that triggers the loop
 		},
 	) {
-		return ctx.runAction((this.component.lib as any).triggerLoop, {
+		return ctx.runAction(this.lib.triggerLoop, {
 			apiKey: this.apiKey,
 			...options,
 		});

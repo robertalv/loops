@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { api, internal } from "../../src/component/_generated/api";
-import { mockContactCreate, resetMocks, setupMockFetch } from "./mock-setup.ts";
-import { convexTest } from "./setup.test.ts";
+import { api } from "../../src/component/_generated/api";
+import { internalLib } from "../../src/types";
+import { mockContactCreate, resetMocks, setupMockFetch } from "./mock-setup";
+import { convexTest } from "./setup.test";
 
 describe("component lib", () => {
 	let restoreFetch: (() => void) | undefined;
@@ -128,13 +129,13 @@ describe("component lib", () => {
 		const t = convexTest();
 
 		// Wait a bit to ensure different timestamps
-		await t.mutation(internal.lib.logEmailOperation as any, {
+		await t.mutation(internalLib.logEmailOperation, {
 			operationType: "transactional",
 			email: "ratelimit@example.com",
 			success: true,
 		});
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		await t.mutation(internal.lib.logEmailOperation as any, {
+		await t.mutation(internalLib.logEmailOperation, {
 			operationType: "transactional",
 			email: "ratelimit@example.com",
 			success: true,
@@ -155,7 +156,7 @@ describe("component lib", () => {
 		const t = convexTest();
 
 		for (let i = 0; i < 12; i++) {
-			await t.mutation(internal.lib.logEmailOperation as any, {
+			await t.mutation(internalLib.logEmailOperation, {
 				operationType: "transactional",
 				email: "exceeded@example.com",
 				success: true,
@@ -180,20 +181,20 @@ describe("component lib", () => {
 	test("getEmailStats returns correct statistics", async () => {
 		const t = convexTest();
 
-		await t.mutation(internal.lib.logEmailOperation as any, {
+		await t.mutation(internalLib.logEmailOperation, {
 			operationType: "transactional",
 			email: "stats1@example.com",
 			success: true,
 		});
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		await t.mutation(internal.lib.logEmailOperation as any, {
+		await t.mutation(internalLib.logEmailOperation, {
 			operationType: "event",
 			email: "stats2@example.com",
 			eventName: "test-event",
 			success: true,
 		});
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		await t.mutation(internal.lib.logEmailOperation as any, {
+		await t.mutation(internalLib.logEmailOperation, {
 			operationType: "transactional",
 			email: "stats3@example.com",
 			success: false,
@@ -206,8 +207,8 @@ describe("component lib", () => {
 		expect(stats.totalOperations).toBe(3);
 		expect(stats.successfulOperations).toBe(2);
 		expect(stats.failedOperations).toBe(1);
-		expect((stats.operationsByType as any).transactional).toBe(2);
-		expect((stats.operationsByType as any).event).toBe(1);
+		expect(stats.operationsByType.transactional).toBe(2);
+		expect(stats.operationsByType.event).toBe(1);
 		expect(stats.uniqueRecipients).toBe(3);
 	});
 
@@ -215,7 +216,7 @@ describe("component lib", () => {
 		const t = convexTest();
 
 		for (let i = 0; i < 15; i++) {
-			await t.mutation(internal.lib.logEmailOperation as any, {
+			await t.mutation(internalLib.logEmailOperation, {
 				operationType: "transactional",
 				email: "spam@example.com",
 				success: true,
