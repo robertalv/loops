@@ -1,6 +1,6 @@
 {
 	"name": "@devwithbobby/loops",
-	"version": "0.1.15",
+	"version": "0.1.16",
 	"description": "Convex component for integrating with Loops.so email marketing platform",
 	"license": "Apache-2.0",
 	"type": "module",
