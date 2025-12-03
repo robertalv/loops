@@ -27,7 +27,7 @@ const allowedOrigin =
 
 
 http.route({
-	pathPrefix: "/loops",
+	pathPrefix: "/loops/",
 	method: "OPTIONS",
 	handler: httpAction(async (_ctx, request) => {
 		const headers = buildCorsHeaders();
