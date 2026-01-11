@@ -117,6 +117,10 @@ export const logEmailOperation = zm({
 /**
  * Count contacts in the database
  * Can filter by audience criteria (userGroup, source, subscribed status)
+ *
+ * Note: When multiple filters are provided, only one index can be used.
+ * Additional filters are applied in-memory, which is efficient for small result sets.
+ * For large contact lists with multiple filters, consider using a composite index.
  */
 export const countContacts = zq({
 	args: z.object({
@@ -126,7 +130,10 @@ export const countContacts = zq({
 	}),
 	returns: z.number(),
 	handler: async (ctx, args) => {
+		// Build query using the most selective index available
+		// Priority: userGroup > source > subscribed
 		let contacts: Doc<"contacts">[];
+
 		if (args.userGroup !== undefined) {
 			contacts = await ctx.db
 				.query("contacts")
@@ -146,17 +153,32 @@ export const countContacts = zq({
 			contacts = await ctx.db.query("contacts").collect();
 		}
 
-		if (args.userGroup !== undefined && contacts) {
-			contacts = contacts.filter((c) => c.userGroup === args.userGroup);
-		}
-		if (args.source !== undefined && contacts) {
-			contacts = contacts.filter((c) => c.source === args.source);
-		}
-		if (args.subscribed !== undefined && contacts) {
-			contacts = contacts.filter((c) => c.subscribed === args.subscribed);
+		// Apply additional filters if multiple criteria were provided
+		// This avoids redundant filtering when only one filter was used
+		const needsFiltering =
+			(args.userGroup !== undefined ? 1 : 0) +
+				(args.source !== undefined ? 1 : 0) +
+				(args.subscribed !== undefined ? 1 : 0) >
+			1;
+
+		if (!needsFiltering) {
+			return contacts.length;
 		}
 
-		return contacts.length;
+		const filtered = contacts.filter((c) => {
+			if (args.userGroup !== undefined && c.userGroup !== args.userGroup) {
+				return false;
+			}
+			if (args.source !== undefined && c.source !== args.source) {
+				return false;
+			}
+			if (args.subscribed !== undefined && c.subscribed !== args.subscribed) {
+				return false;
+			}
+			return true;
+		});
+
+		return filtered.length;
 	},
 });
 
@@ -164,6 +186,9 @@ export const countContacts = zq({
  * List contacts from the database with pagination
  * Can filter by audience criteria (userGroup, source, subscribed status)
  * Returns actual contact data, not just a count
+ *
+ * Note: When multiple filters are provided, only one index can be used.
+ * Additional filters are applied in-memory before pagination.
  */
 export const listContacts = zq({
 	args: z.object({
@@ -195,9 +220,9 @@ export const listContacts = zq({
 		hasMore: z.boolean(),
 	}),
 	handler: async (ctx, args) => {
+		// Build query using the most selective index available
 		let allContacts: Doc<"contacts">[];
 
-		// Get all contacts matching the filters
 		if (args.userGroup !== undefined) {
 			allContacts = await ctx.db
 				.query("contacts")
@@ -217,15 +242,26 @@ export const listContacts = zq({
 			allContacts = await ctx.db.query("contacts").collect();
 		}
 
-		// Apply additional filters (for cases where we need to filter by multiple criteria)
-		if (args.userGroup !== undefined && allContacts) {
-			allContacts = allContacts.filter((c) => c.userGroup === args.userGroup);
-		}
-		if (args.source !== undefined && allContacts) {
-			allContacts = allContacts.filter((c) => c.source === args.source);
-		}
-		if (args.subscribed !== undefined && allContacts) {
-			allContacts = allContacts.filter((c) => c.subscribed === args.subscribed);
+		// Apply additional filters if multiple criteria were provided
+		const needsFiltering =
+			(args.userGroup !== undefined ? 1 : 0) +
+				(args.source !== undefined ? 1 : 0) +
+				(args.subscribed !== undefined ? 1 : 0) >
+			1;
+
+		if (needsFiltering) {
+			allContacts = allContacts.filter((c) => {
+				if (args.userGroup !== undefined && c.userGroup !== args.userGroup) {
+					return false;
+				}
+				if (args.source !== undefined && c.source !== args.source) {
+					return false;
+				}
+				if (args.subscribed !== undefined && c.subscribed !== args.subscribed) {
+					return false;
+				}
+				return true;
+			});
 		}
 
 		// Sort by createdAt (newest first)
@@ -488,7 +524,7 @@ export const sendEvent = za({
 	returns: z.object({
 		success: z.boolean(),
 	}),
-	handler: async (_ctx, args) => {
+	handler: async (ctx, args) => {
 		const response = await loopsFetch(args.apiKey, "/events/send", {
 			method: "POST",
 			json: {
@@ -501,8 +537,21 @@ export const sendEvent = za({
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error(`Loops API error [${response.status}]:`, errorText);
+			await ctx.runMutation(internalLib.logEmailOperation, {
+				operationType: "event",
+				email: args.email,
+				success: false,
+				eventName: args.eventName,
+			});
 			throw sanitizeLoopsError(response.status, errorText);
 		}
+
+		await ctx.runMutation(internalLib.logEmailOperation, {
+			operationType: "event",
+			email: args.email,
+			success: true,
+			eventName: args.eventName,
+		});
 
 		return { success: true };
 	},

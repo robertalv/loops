@@ -480,6 +480,18 @@ export class Loops {
 					return await this.countContacts(ctx, args);
 				},
 			}),
+			listContacts: queryGeneric({
+				args: {
+					userGroup: v.optional(v.string()),
+					source: v.optional(v.string()),
+					subscribed: v.optional(v.boolean()),
+					limit: v.optional(v.number()),
+					offset: v.optional(v.number()),
+				},
+				handler: async (ctx, args) => {
+					return await this.listContacts(ctx, args);
+				},
+			}),
 			detectRecipientSpam: queryGeneric({
 				args: {
 					timeWindowMs: v.optional(v.number()),

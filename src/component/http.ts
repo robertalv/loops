@@ -22,10 +22,6 @@ import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
 
-const allowedOrigin =
-	process.env.LOOPS_HTTP_ALLOWED_ORIGIN ?? process.env.CLIENT_ORIGIN ?? "*";
-
-
 http.route({
 	pathPrefix: "/loops/",
 	method: "OPTIONS",
