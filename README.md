@@ -6,13 +6,13 @@ A Convex component for integrating with [Loops.so](https://loops.so) email marke
 
 ## Features
 
-- ✅ **Contact Management** - Create, update, find, and delete contacts
-- ✅ **Transactional Emails** - Send one-off emails with templates
-- ✅ **Events** - Trigger email workflows based on events
-- ✅ **Loops** - Trigger automated email sequences
-- ✅ **Monitoring** - Track all email operations with spam detection
-- ✅ **Rate Limiting** - Built-in rate limiting queries for abuse prevention
-- ✅ **Type-Safe** - Full TypeScript support with Zod validation
+- **Contact Management** - Create, update, find, list, and delete contacts
+- **Transactional Emails** - Send one-off emails with templates
+- **Events** - Trigger email workflows based on events
+- **Loops** - Trigger automated email sequences
+- **Monitoring** - Track all email operations with spam detection
+- **Rate Limiting** - Built-in rate limiting queries for abuse prevention
+- **Type-Safe** - Full TypeScript support with Zod validation
 
 ## Installation
 
@@ -40,17 +40,17 @@ export default app;
 
 ### 2. Set Up Environment Variables
 
-**⚠️ IMPORTANT: Set your Loops API key before using the component.**
+**IMPORTANT: Set your Loops API key before using the component.**
 
 ```bash
 npx convex env set LOOPS_API_KEY "your-loops-api-key-here"
 ```
 
 **Or via Convex Dashboard:**
-1. Go to Settings → Environment Variables
+1. Go to Settings -> Environment Variables
 2. Add `LOOPS_API_KEY` with your Loops.so API key
 
-Get your API key from [Loops.so Dashboard](https://app.loops.so/settings/api).
+Get your API key from [Loops.so Dashboard](https://app.loops.so/settings?page=api).
 
 ### 3. Use the Component
 
@@ -133,6 +133,27 @@ await loops.updateContact(ctx, "user@example.com", {
 
 ```typescript
 const contact = await loops.findContact(ctx, "user@example.com");
+```
+
+#### List Contacts
+
+List contacts with pagination and optional filtering.
+
+```typescript
+// Simple list with default limit (100)
+const result = await loops.listContacts(ctx);
+
+// List with filters and pagination
+const result = await loops.listContacts(ctx, {
+  userGroup: "premium",
+  subscribed: true,
+  limit: 20,
+  offset: 0
+});
+
+console.log(result.contacts); // Array of contacts
+console.log(result.total);    // Total count matching filters
+console.log(result.hasMore);  // Boolean indicating if more pages exist
 ```
 
 #### Delete Contact
@@ -335,11 +356,12 @@ export const {
   sendEvent,
   triggerLoop,
   countContacts,
+  listContacts,
   // ... all other functions
 } = loops.api();
 ```
 
-**⚠️ Security Warning:** The `api()` helper exports functions without authentication. Always wrap these functions with auth checks in production:
+**Security Warning:** The `api()` helper exports functions without authentication. Always wrap these functions with auth checks in production:
 
 ```typescript
 export const addContact = action({
@@ -392,12 +414,12 @@ npx convex env set LOOPS_API_KEY "your-api-key"
 
 **Via Dashboard:**
 1. Go to your Convex Dashboard
-2. Navigate to Settings → Environment Variables
+2. Navigate to Settings -> Environment Variables
 3. Add `LOOPS_API_KEY` with your Loops.so API key value
 
-Get your API key from [Loops.so Dashboard](https://app.loops.so/settings/api).
+Get your API key from [Loops.so Dashboard](https://app.loops.so/settings?page=api).
 
-⚠️ **Never** pass the API key directly in code or via function options in production. Always use environment variables.
+**Never** pass the API key directly in code or via function options in production. Always use environment variables.
 
 ## Monitoring & Rate Limiting
 
@@ -458,15 +480,16 @@ example/                   # Example app
 
 This component implements the following Loops.so API endpoints:
 
-- ✅ Create/Update Contact
-- ✅ Delete Contact
-- ✅ Find Contact
-- ✅ Batch Create Contacts
-- ✅ Unsubscribe/Resubscribe Contact
-- ✅ Count Contacts (custom implementation)
-- ✅ Send Transactional Email
-- ✅ Send Event
-- ✅ Trigger Loop
+- Create/Update Contact
+- Delete Contact
+- Find Contact
+- Batch Create Contacts
+- Unsubscribe/Resubscribe Contact
+- Count Contacts (custom implementation)
+- List Contacts (custom implementation)
+- Send Transactional Email
+- Send Event
+- Trigger Loop
 
 ## Contributing
 

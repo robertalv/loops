@@ -70,7 +70,7 @@ export class Loops {
 			console.warn(
 				"API key passed directly via options. " +
 					"For security, use LOOPS_API_KEY environment variable instead. " +
-					"See ENV_SETUP.md for details.",
+					"See README.md for details.",
 			);
 		}
 

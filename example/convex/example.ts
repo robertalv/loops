@@ -11,7 +11,7 @@ import { components } from "./_generated/api";
  * - Convex Dashboard: Settings → Environment Variables → Add LOOPS_API_KEY
  * - CLI: npx convex env set LOOPS_API_KEY "your-api-key"
  *
- * See ENV_SETUP.md for detailed setup instructions.
+ * See README.md for detailed setup instructions.
  *
  * ⚠️ NEVER pass the API key directly via options in production code.
  * Only use options.apiKey for local testing.
@@ -38,7 +38,7 @@ const loops = new Loops(components.loops);
  *
  * 5. Audit sensitive operations (delete, unsubscribe, send emails)
  *
- * See SECURITY.md for detailed security guidelines.
+ * See README.md for detailed security guidelines.
  */
 
 /**
