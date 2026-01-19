@@ -107,7 +107,7 @@ http.route({
 				source: url.searchParams.get("source") ?? undefined,
 				subscribed: booleanFromQuery(url.searchParams.get("subscribed")),
 				limit: numberFromQuery(url.searchParams.get("limit"), 100),
-				offset: numberFromQuery(url.searchParams.get("offset"), 0),
+				cursor: url.searchParams.get("cursor") ?? null,
 			});
 			return jsonResponse(data);
 		} catch (error) {

@@ -195,9 +195,12 @@ export class Loops {
 	}
 
 	/**
-	 * List contacts with pagination and optional filters
+	 * List contacts with cursor-based pagination and optional filters
 	 * Returns actual contact data, not just a count
 	 * This queries the component's local database, not Loops API
+	 *
+	 * Uses cursor-based pagination for efficiency. Pass the `continueCursor`
+	 * from the previous response as `cursor` to get the next page.
 	 */
 	async listContacts(
 		ctx: RunQueryCtx,
@@ -206,7 +209,7 @@ export class Loops {
 			source?: string;
 			subscribed?: boolean;
 			limit?: number;
-			offset?: number;
+			cursor?: string | null;
 		},
 	) {
 		return ctx.runQuery(this.lib.listContacts, {
@@ -214,7 +217,7 @@ export class Loops {
 			source: options?.source,
 			subscribed: options?.subscribed,
 			limit: options?.limit ?? 100,
-			offset: options?.offset ?? 0,
+			cursor: options?.cursor ?? null,
 		});
 	}
 
@@ -491,7 +494,7 @@ export class Loops {
 					source: v.optional(v.string()),
 					subscribed: v.optional(v.boolean()),
 					limit: v.optional(v.number()),
-					offset: v.optional(v.number()),
+					cursor: v.optional(v.union(v.string(), v.null())),
 				},
 				handler: async (ctx, args) => {
 					return await this.listContacts(ctx, args);

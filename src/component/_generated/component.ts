@@ -183,8 +183,8 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "query",
         "internal",
         {
+          cursor?: string | null;
           limit?: number;
-          offset?: number;
           source?: string;
           subscribed?: boolean;
           userGroup?: string;
@@ -203,10 +203,8 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             userGroup?: string;
             userId?: string;
           }>;
-          hasMore: boolean;
-          limit: number;
-          offset: number;
-          total: number;
+          continueCursor: string | null;
+          isDone: boolean;
         },
         Name
       >;

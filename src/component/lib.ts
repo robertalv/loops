@@ -1,8 +1,11 @@
+import { paginator } from "convex-helpers/server/pagination";
+import type { PaginationResult } from "convex/server";
 import { z } from "zod";
 import { internalLib } from "../types";
 import { za, zm, zq } from "../utils.js";
 import type { Doc } from "./_generated/dataModel.js";
 import { loopsFetch, sanitizeLoopsError } from "./helpers";
+import schema from "./schema";
 import { contactValidator } from "./validators.js";
 
 /**
@@ -183,12 +186,15 @@ export const countContacts = zq({
 });
 
 /**
- * List contacts from the database with pagination
+ * List contacts from the database with cursor-based pagination
  * Can filter by audience criteria (userGroup, source, subscribed status)
  * Returns actual contact data, not just a count
  *
+ * Uses cursor-based pagination for efficient querying - only reads documents
+ * from the cursor position forward, not all preceding documents.
+ *
  * Note: When multiple filters are provided, only one index can be used.
- * Additional filters are applied in-memory before pagination.
+ * Additional filters are applied in-memory after fetching.
  */
 export const listContacts = zq({
 	args: z.object({
@@ -196,7 +202,7 @@ export const listContacts = zq({
 		source: z.string().optional(),
 		subscribed: z.boolean().optional(),
 		limit: z.number().min(1).max(1000).default(100),
-		offset: z.number().min(0).default(0),
+		cursor: z.string().nullable().optional(),
 	}),
 	returns: z.object({
 		contacts: z.array(
@@ -214,43 +220,54 @@ export const listContacts = zq({
 				updatedAt: z.number(),
 			}),
 		),
-		total: z.number(),
-		limit: z.number(),
-		offset: z.number(),
-		hasMore: z.boolean(),
+		continueCursor: z.string().nullable(),
+		isDone: z.boolean(),
 	}),
 	handler: async (ctx, args) => {
-		// Build query using the most selective index available
-		let allContacts: Doc<"contacts">[];
+		const paginationOpts = {
+			cursor: args.cursor ?? null,
+			numItems: args.limit,
+		};
 
-		if (args.userGroup !== undefined) {
-			allContacts = await ctx.db
-				.query("contacts")
-				.withIndex("userGroup", (q) => q.eq("userGroup", args.userGroup))
-				.collect();
-		} else if (args.source !== undefined) {
-			allContacts = await ctx.db
-				.query("contacts")
-				.withIndex("source", (q) => q.eq("source", args.source))
-				.collect();
-		} else if (args.subscribed !== undefined) {
-			allContacts = await ctx.db
-				.query("contacts")
-				.withIndex("subscribed", (q) => q.eq("subscribed", args.subscribed))
-				.collect();
-		} else {
-			allContacts = await ctx.db.query("contacts").collect();
-		}
-
-		// Apply additional filters if multiple criteria were provided
+		// Determine which index to use based on filters
 		const needsFiltering =
 			(args.userGroup !== undefined ? 1 : 0) +
 				(args.source !== undefined ? 1 : 0) +
 				(args.subscribed !== undefined ? 1 : 0) >
 			1;
 
+		let result: PaginationResult<Doc<"contacts">>;
+
+		if (args.userGroup !== undefined) {
+			result = await paginator(ctx.db, schema)
+				.query("contacts")
+				.withIndex("userGroup", (q) => q.eq("userGroup", args.userGroup))
+				.order("desc")
+				.paginate(paginationOpts);
+		} else if (args.source !== undefined) {
+			result = await paginator(ctx.db, schema)
+				.query("contacts")
+				.withIndex("source", (q) => q.eq("source", args.source))
+				.order("desc")
+				.paginate(paginationOpts);
+		} else if (args.subscribed !== undefined) {
+			result = await paginator(ctx.db, schema)
+				.query("contacts")
+				.withIndex("subscribed", (q) => q.eq("subscribed", args.subscribed))
+				.order("desc")
+				.paginate(paginationOpts);
+		} else {
+			result = await paginator(ctx.db, schema)
+				.query("contacts")
+				.order("desc")
+				.paginate(paginationOpts);
+		}
+
+		let contacts = result.page;
+
+		// Apply additional filters if multiple criteria were provided
 		if (needsFiltering) {
-			allContacts = allContacts.filter((c) => {
+			contacts = contacts.filter((c) => {
 				if (args.userGroup !== undefined && c.userGroup !== args.userGroup) {
 					return false;
 				}
@@ -264,24 +281,15 @@ export const listContacts = zq({
 			});
 		}
 
-		// Sort by createdAt (newest first)
-		allContacts.sort((a, b) => b.createdAt - a.createdAt);
-
-		const total = allContacts.length;
-		const paginatedContacts = allContacts
-			.slice(args.offset, args.offset + args.limit)
-			.map((contact) => ({
-				...contact,
-				subscribed: contact.subscribed ?? true, // Ensure subscribed is always boolean
-			}));
-		const hasMore = args.offset + args.limit < total;
+		const mappedContacts = contacts.map((contact) => ({
+			...contact,
+			subscribed: contact.subscribed ?? true,
+		}));
 
 		return {
-			contacts: paginatedContacts,
-			total,
-			limit: args.limit,
-			offset: args.offset,
-			hasMore,
+			contacts: mappedContacts,
+			continueCursor: result.continueCursor,
+			isDone: result.isDone,
 		};
 	},
 });

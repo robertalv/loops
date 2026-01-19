@@ -191,8 +191,8 @@ export declare const components: {
         "query",
         "internal",
         {
+          cursor?: string | null;
           limit?: number;
-          offset?: number;
           source?: string;
           subscribed?: boolean;
           userGroup?: string;
@@ -211,10 +211,8 @@ export declare const components: {
             userGroup?: string;
             userId?: string;
           }>;
-          hasMore: boolean;
-          limit: number;
-          offset: number;
-          total: number;
+          continueCursor: string | null;
+          isDone: boolean;
         }
       >;
       logEmailOperation: FunctionReference<
