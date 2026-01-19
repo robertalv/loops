@@ -1,6 +1,6 @@
 /* eslint-disable */
 /**
- * Generated `api` utility.
+ * Generated `ComponentApi` utility.
  *
  * THIS CODE IS AUTOMATICALLY GENERATED.
  *
@@ -8,46 +8,21 @@
  * @module
  */
 
-import type * as example from "../example.js";
-
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
-
-declare const fullApi: ApiFromModules<{
-  example: typeof example;
-}>;
+import type { FunctionReference } from "convex/server";
 
 /**
- * A utility for referencing Convex functions in your app's public API.
+ * A utility for referencing a Convex component's exposed API.
  *
+ * Useful when expecting a parameter like `components.myComponent`.
  * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
+ * ```ts
+ * async function myFunction(ctx: QueryCtx, component: ComponentApi) {
+ *   return ctx.runQuery(component.someFile.someQuery, { ...args });
+ * }
  * ```
  */
-export declare const api: FilterApi<
-  typeof fullApi,
-  FunctionReference<any, "public">
->;
-
-/**
- * A utility for referencing Convex functions in your app's internal API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = internal.myModule.myFunction;
- * ```
- */
-export declare const internal: FilterApi<
-  typeof fullApi,
-  FunctionReference<any, "internal">
->;
-
-export declare const components: {
-  loops: {
+export type ComponentApi<Name extends string | undefined = string | undefined> =
+  {
     lib: {
       addContact: FunctionReference<
         "action",
@@ -64,7 +39,8 @@ export declare const components: {
             userId?: string;
           };
         },
-        { id?: string; success: boolean }
+        { id?: string; success: boolean },
+        Name
       >;
       batchCreateContacts: FunctionReference<
         "action",
@@ -86,7 +62,8 @@ export declare const components: {
           failed?: number;
           results?: Array<{ email: string; error?: string; success: boolean }>;
           success: boolean;
-        }
+        },
+        Name
       >;
       checkActorRateLimit: FunctionReference<
         "query",
@@ -98,13 +75,20 @@ export declare const components: {
           limit: number;
           retryAfter?: number;
           timeWindowMs: number;
-        }
+        },
+        Name
       >;
       checkGlobalRateLimit: FunctionReference<
         "query",
         "internal",
         { maxEmails: number; timeWindowMs: number },
-        { allowed: boolean; count: number; limit: number; timeWindowMs: number }
+        {
+          allowed: boolean;
+          count: number;
+          limit: number;
+          timeWindowMs: number;
+        },
+        Name
       >;
       checkRecipientRateLimit: FunctionReference<
         "query",
@@ -116,25 +100,29 @@ export declare const components: {
           limit: number;
           retryAfter?: number;
           timeWindowMs: number;
-        }
+        },
+        Name
       >;
       countContacts: FunctionReference<
         "query",
         "internal",
         { source?: string; subscribed?: boolean; userGroup?: string },
-        number
+        number,
+        Name
       >;
       deleteContact: FunctionReference<
         "action",
         "internal",
         { apiKey: string; email: string },
-        { success: boolean }
+        { success: boolean },
+        Name
       >;
       detectActorSpam: FunctionReference<
         "query",
         "internal",
         { maxEmailsPerActor?: number; timeWindowMs?: number },
-        Array<{ actorId: string; count: number; timeWindowMs: number }>
+        Array<{ actorId: string; count: number; timeWindowMs: number }>,
+        Name
       >;
       detectRapidFirePatterns: FunctionReference<
         "query",
@@ -147,13 +135,15 @@ export declare const components: {
           firstTimestamp: number;
           lastTimestamp: number;
           timeWindowMs: number;
-        }>
+        }>,
+        Name
       >;
       detectRecipientSpam: FunctionReference<
         "query",
         "internal",
         { maxEmailsPerRecipient?: number; timeWindowMs?: number },
-        Array<{ count: number; email: string; timeWindowMs: number }>
+        Array<{ count: number; email: string; timeWindowMs: number }>,
+        Name
       >;
       findContact: FunctionReference<
         "action",
@@ -172,7 +162,8 @@ export declare const components: {
             userId?: string | null;
           };
           success: boolean;
-        }
+        },
+        Name
       >;
       getEmailStats: FunctionReference<
         "query",
@@ -185,7 +176,8 @@ export declare const components: {
           totalOperations: number;
           uniqueActors: number;
           uniqueRecipients: number;
-        }
+        },
+        Name
       >;
       listContacts: FunctionReference<
         "query",
@@ -215,7 +207,8 @@ export declare const components: {
           limit: number;
           offset: number;
           total: number;
-        }
+        },
+        Name
       >;
       logEmailOperation: FunctionReference<
         "mutation",
@@ -232,19 +225,22 @@ export declare const components: {
           success: boolean;
           transactionalId?: string;
         },
-        any
+        any,
+        Name
       >;
       removeContact: FunctionReference<
         "mutation",
         "internal",
         { email: string },
-        any
+        any,
+        Name
       >;
       resubscribeContact: FunctionReference<
         "action",
         "internal",
         { apiKey: string; email: string },
-        { success: boolean }
+        { success: boolean },
+        Name
       >;
       sendEvent: FunctionReference<
         "action",
@@ -255,7 +251,8 @@ export declare const components: {
           eventName: string;
           eventProperties?: Record<string, any>;
         },
-        { success: boolean }
+        { success: boolean },
+        Name
       >;
       sendTransactional: FunctionReference<
         "action",
@@ -266,7 +263,8 @@ export declare const components: {
           email: string;
           transactionalId: string;
         },
-        { messageId?: string; success: boolean }
+        { messageId?: string; success: boolean },
+        Name
       >;
       storeContact: FunctionReference<
         "mutation",
@@ -281,7 +279,8 @@ export declare const components: {
           userGroup?: string;
           userId?: string;
         },
-        any
+        any,
+        Name
       >;
       triggerLoop: FunctionReference<
         "action",
@@ -293,13 +292,15 @@ export declare const components: {
           eventName?: string;
           loopId: string;
         },
-        { success: boolean; warning?: string }
+        { success: boolean; warning?: string },
+        Name
       >;
       unsubscribeContact: FunctionReference<
         "action",
         "internal",
         { apiKey: string; email: string },
-        { success: boolean }
+        { success: boolean },
+        Name
       >;
       updateContact: FunctionReference<
         "action",
@@ -315,8 +316,8 @@ export declare const components: {
           userGroup?: string;
           userId?: string;
         },
-        { success: boolean }
+        { success: boolean },
+        Name
       >;
     };
   };
-};

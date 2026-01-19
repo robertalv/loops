@@ -9,7 +9,15 @@ import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 
-const convexURL = process.env.CONVEX_URL;
+// Get CONVEX_URL from window (injected by server into HTML)
+// We use window instead of import.meta.env because Bun's dev server
+// doesn't auto-inject env vars into client bundles
+declare global {
+	interface Window {
+		CONVEX_URL?: string;
+	}
+}
+const convexURL = window.CONVEX_URL;
 
 if (!convexURL) {
 	throw new Error("No convex URL provided!");

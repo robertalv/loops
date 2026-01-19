@@ -7,6 +7,17 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Synchronous config load before modules
+      var xhr = new XMLHttpRequest();
+      var config;
+      xhr.open('GET', '/_bun/config', false); // synchronous
+      xhr.send();
+      if (xhr.status === 200) {
+        config = JSON.parse(xhr.responseText);
+        window.CONVEX_URL = config.CONVEX_URL;
+      }
+    </script>
     <script type="module" src="./frontend.tsx"></script>
   </body>
 </html>

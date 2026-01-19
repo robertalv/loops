@@ -1,4 +1,4 @@
-import { Loops } from "devwithbobby/loops";
+import { Loops } from "@devwithbobby/loops";
 import { components } from "./_generated/api";
 
 /**

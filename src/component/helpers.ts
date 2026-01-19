@@ -1,4 +1,4 @@
-import { type HeadersInitParam } from "../types";
+import type { HeadersInitParam } from "../types";
 
 const allowedOrigin =
 	process.env.CONVEX_URL ??
@@ -82,7 +82,7 @@ export const emptyResponse = (init?: ResponseInit) => {
 export const readJsonBody = async <T>(request: Request): Promise<T> => {
 	try {
 		return (await request.json()) as T;
-	} catch (error) {
+	} catch (_error) {
 		throw new Error("Invalid JSON body");
 	}
 };

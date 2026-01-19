@@ -1,9 +1,9 @@
 import { actionGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
-import type { Mounts } from "../component/_generated/api";
-import type { RunActionCtx, RunQueryCtx, UseApi } from "../types";
+import type { ComponentApi } from "../component/_generated/component.js";
+import type { RunActionCtx, RunQueryCtx } from "../types";
 
-export type LoopsComponent = UseApi<Mounts>;
+export type LoopsComponent = ComponentApi;
 
 export interface ContactData {
 	email: string;
@@ -32,6 +32,7 @@ export class Loops {
 		apiKey?: string;
 	};
 	private readonly lib: NonNullable<LoopsComponent["lib"]>;
+	private _apiKey?: string;
 
 	constructor(
 		component: LoopsComponent,
@@ -58,13 +59,7 @@ export class Loops {
 
 		this.lib = component.lib;
 		this.options = options;
-
-		const apiKey = options?.apiKey ?? process.env.LOOPS_API_KEY;
-		if (!apiKey) {
-			throw new Error(
-				"Loops API key is required. Set LOOPS_API_KEY in your Convex environment variables.",
-			);
-		}
+		this._apiKey = options?.apiKey;
 
 		if (options?.apiKey) {
 			console.warn(
@@ -73,11 +68,21 @@ export class Loops {
 					"See README.md for details.",
 			);
 		}
-
-		this.apiKey = apiKey;
 	}
 
-	private readonly apiKey: string;
+	/**
+	 * Get the API key, checking environment at call time (not constructor time).
+	 * This allows the Loops client to be instantiated at module load time.
+	 */
+	private get apiKey(): string {
+		const key = this._apiKey ?? process.env.LOOPS_API_KEY;
+		if (!key) {
+			throw new Error(
+				"Loops API key is required. Set LOOPS_API_KEY in your Convex environment variables.",
+			);
+		}
+		return key;
+	}
 
 	/**
 	 * Add or update a contact in Loops
