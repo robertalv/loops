@@ -1,0 +1,25 @@
+{
+  "name": "loops-component-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:bun": "bun --hot src/index.tsx",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "convex": "^1.28.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.16",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^4.5.2",
+    "tailwindcss": "^4.1.16",
+    "vite": "^6.3.5"
+  }
+}
