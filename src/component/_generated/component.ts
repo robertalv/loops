@@ -42,6 +42,13 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         { id?: string; success: boolean },
         Name
       >;
+      backfillContactAggregate: FunctionReference<
+        "mutation",
+        "internal",
+        { batchSize?: number; clear?: boolean; cursor?: string | null },
+        { cursor: string | null; isDone: boolean; processed: number },
+        Name
+      >;
       batchCreateContacts: FunctionReference<
         "action",
         "internal",

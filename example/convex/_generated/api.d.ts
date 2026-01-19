@@ -66,6 +66,12 @@ export declare const components: {
         },
         { id?: string; success: boolean }
       >;
+      backfillContactAggregate: FunctionReference<
+        "mutation",
+        "internal",
+        { batchSize?: number; clear?: boolean; cursor?: string | null },
+        { cursor: string | null; isDone: boolean; processed: number }
+      >;
       batchCreateContacts: FunctionReference<
         "action",
         "internal",

@@ -4,6 +4,14 @@ import { z } from "zod";
 import { internalLib } from "../types";
 import { za, zm, zq } from "../utils.js";
 import type { Doc } from "./_generated/dataModel.js";
+import {
+	aggregateClear,
+	aggregateCountByUserGroup,
+	aggregateCountTotal,
+	aggregateDelete,
+	aggregateInsert,
+	aggregateReplace,
+} from "./aggregates";
 import { loopsFetch, sanitizeLoopsError } from "./helpers";
 import schema from "./schema";
 import { contactValidator } from "./validators.js";
@@ -31,6 +39,7 @@ export const storeContact = zm({
 			.unique();
 
 		if (existing) {
+			// Update the contact
 			await ctx.db.patch(existing._id, {
 				firstName: args.firstName,
 				lastName: args.lastName,
@@ -41,8 +50,15 @@ export const storeContact = zm({
 				loopsContactId: args.loopsContactId,
 				updatedAt: now,
 			});
+
+			// Get the updated document and update aggregate if userGroup changed
+			const updated = await ctx.db.get(existing._id);
+			if (updated && existing.userGroup !== updated.userGroup) {
+				await aggregateReplace(ctx, existing, updated);
+			}
 		} else {
-			await ctx.db.insert("contacts", {
+			// Insert new contact
+			const id = await ctx.db.insert("contacts", {
 				email: args.email,
 				firstName: args.firstName,
 				lastName: args.lastName,
@@ -54,6 +70,12 @@ export const storeContact = zm({
 				createdAt: now,
 				updatedAt: now,
 			});
+
+			// Add to aggregate for counting
+			const newDoc = await ctx.db.get(id);
+			if (newDoc) {
+				await aggregateInsert(ctx, newDoc);
+			}
 		}
 	},
 });
@@ -73,6 +95,8 @@ export const removeContact = zm({
 			.unique();
 
 		if (existing) {
+			// Remove from aggregate first (before deleting the document)
+			await aggregateDelete(ctx, existing);
 			await ctx.db.delete(existing._id);
 		}
 	},
@@ -118,12 +142,26 @@ export const logEmailOperation = zm({
 });
 
 /**
+ * Maximum number of documents to read when counting with filters.
+ * This limit prevents query read limit errors while still providing accurate
+ * counts for most use cases. If you have more contacts than this, consider
+ * using the aggregate-based counting with userGroup only.
+ */
+const MAX_COUNT_LIMIT = 8000;
+
+/**
  * Count contacts in the database
  * Can filter by audience criteria (userGroup, source, subscribed status)
  *
- * Note: When multiple filters are provided, only one index can be used.
- * Additional filters are applied in-memory, which is efficient for small result sets.
- * For large contact lists with multiple filters, consider using a composite index.
+ * For userGroup-only filtering, uses efficient O(log n) aggregate counting.
+ * For other filters (source, subscribed), uses indexed queries with a read limit.
+ *
+ * IMPORTANT: Before using this with existing data, run the backfillContactAggregate
+ * mutation to populate the aggregate with existing contacts.
+ *
+ * NOTE: When filtering by source or subscribed, counts are capped at MAX_COUNT_LIMIT
+ * to avoid query read limit errors. For exact counts with large datasets, use
+ * userGroup-only filtering which uses efficient aggregate counting.
  */
 export const countContacts = zq({
 	args: z.object({
@@ -133,41 +171,45 @@ export const countContacts = zq({
 	}),
 	returns: z.number(),
 	handler: async (ctx, args) => {
-		// Build query using the most selective index available
-		// Priority: userGroup > source > subscribed
+		// If only userGroup is specified (or no filters), use efficient aggregate counting
+		const onlyUserGroupFilter =
+			args.source === undefined && args.subscribed === undefined;
+
+		if (onlyUserGroupFilter) {
+			// Use O(log n) aggregate counting - much more efficient than .collect()
+			if (args.userGroup === undefined) {
+				// Count ALL contacts across all namespaces
+				return await aggregateCountTotal(ctx);
+			}
+			// Count contacts in specific userGroup namespace
+			return await aggregateCountByUserGroup(ctx, args.userGroup);
+		}
+
+		// For other filters, we need to use indexed queries with in-memory filtering
+		// We use .take() with a reasonable limit to avoid query read limit errors
 		let contacts: Doc<"contacts">[];
 
 		if (args.userGroup !== undefined) {
 			contacts = await ctx.db
 				.query("contacts")
 				.withIndex("userGroup", (q) => q.eq("userGroup", args.userGroup))
-				.collect();
+				.take(MAX_COUNT_LIMIT);
 		} else if (args.source !== undefined) {
 			contacts = await ctx.db
 				.query("contacts")
 				.withIndex("source", (q) => q.eq("source", args.source))
-				.collect();
+				.take(MAX_COUNT_LIMIT);
 		} else if (args.subscribed !== undefined) {
 			contacts = await ctx.db
 				.query("contacts")
 				.withIndex("subscribed", (q) => q.eq("subscribed", args.subscribed))
-				.collect();
+				.take(MAX_COUNT_LIMIT);
 		} else {
-			contacts = await ctx.db.query("contacts").collect();
+			// This branch shouldn't be reached due to onlyUserGroupFilter check above
+			contacts = await ctx.db.query("contacts").take(MAX_COUNT_LIMIT);
 		}
 
 		// Apply additional filters if multiple criteria were provided
-		// This avoids redundant filtering when only one filter was used
-		const needsFiltering =
-			(args.userGroup !== undefined ? 1 : 0) +
-				(args.source !== undefined ? 1 : 0) +
-				(args.subscribed !== undefined ? 1 : 0) >
-			1;
-
-		if (!needsFiltering) {
-			return contacts.length;
-		}
-
 		const filtered = contacts.filter((c) => {
 			if (args.userGroup !== undefined && c.userGroup !== args.userGroup) {
 				return false;
@@ -877,8 +919,18 @@ export const resubscribeContact = za({
 });
 
 /**
+ * Maximum number of email operations to read for spam detection.
+ * This limit prevents query read limit errors while covering most spam scenarios.
+ * If you need to analyze more operations, consider using scheduled jobs with pagination.
+ */
+const MAX_SPAM_DETECTION_LIMIT = 8000;
+
+/**
  * Check for spam patterns: too many emails to the same recipient in a time window
- * Returns email addresses that received too many emails
+ * Returns email addresses that received too many emails.
+ *
+ * NOTE: Analysis is limited to the most recent MAX_SPAM_DETECTION_LIMIT operations
+ * in the time window to avoid query read limit errors.
  */
 export const detectRecipientSpam = zq({
 	args: z.object({
@@ -900,7 +952,7 @@ export const detectRecipientSpam = zq({
 		const operations = await ctx.db
 			.query("emailOperations")
 			.withIndex("timestamp", (q) => q.gte("timestamp", cutoffTime))
-			.collect();
+			.take(MAX_SPAM_DETECTION_LIMIT);
 
 		const emailCounts = new Map<string, number>();
 		for (const op of operations) {
@@ -930,7 +982,10 @@ export const detectRecipientSpam = zq({
 
 /**
  * Check for spam patterns: too many emails from the same actor/user
- * Returns actor IDs that sent too many emails
+ * Returns actor IDs that sent too many emails.
+ *
+ * NOTE: Analysis is limited to the most recent MAX_SPAM_DETECTION_LIMIT operations
+ * in the time window to avoid query read limit errors.
  */
 export const detectActorSpam = zq({
 	args: z.object({
@@ -950,7 +1005,7 @@ export const detectActorSpam = zq({
 		const operations = await ctx.db
 			.query("emailOperations")
 			.withIndex("timestamp", (q) => q.gte("timestamp", cutoffTime))
-			.collect();
+			.take(MAX_SPAM_DETECTION_LIMIT);
 
 		const actorCounts = new Map<string, number>();
 		for (const op of operations) {
@@ -979,7 +1034,11 @@ export const detectActorSpam = zq({
 });
 
 /**
- * Get recent email operation statistics for monitoring
+ * Get recent email operation statistics for monitoring.
+ *
+ * NOTE: Statistics are calculated from the most recent MAX_SPAM_DETECTION_LIMIT
+ * operations in the time window to avoid query read limit errors. For high-volume
+ * applications, consider using scheduled jobs with pagination for exact statistics.
  */
 export const getEmailStats = zq({
 	args: z.object({
@@ -1001,7 +1060,7 @@ export const getEmailStats = zq({
 		const operations = await ctx.db
 			.query("emailOperations")
 			.withIndex("timestamp", (q) => q.gte("timestamp", cutoffTime))
-			.collect();
+			.take(MAX_SPAM_DETECTION_LIMIT);
 
 		const stats = {
 			totalOperations: operations.length,
@@ -1035,7 +1094,10 @@ export const getEmailStats = zq({
 
 /**
  * Detect rapid-fire email sending patterns (multiple emails sent in quick succession)
- * Returns suspicious patterns indicating potential spam
+ * Returns suspicious patterns indicating potential spam.
+ *
+ * NOTE: Analysis is limited to the most recent MAX_SPAM_DETECTION_LIMIT operations
+ * in the time window to avoid query read limit errors.
  */
 export const detectRapidFirePatterns = zq({
 	args: z.object({
@@ -1058,9 +1120,9 @@ export const detectRapidFirePatterns = zq({
 		const operations = await ctx.db
 			.query("emailOperations")
 			.withIndex("timestamp", (q) => q.gte("timestamp", cutoffTime))
-			.collect();
+			.take(MAX_SPAM_DETECTION_LIMIT);
 
-		operations.sort((a, b) => a.timestamp - b.timestamp);
+		const sortedOps = [...operations].sort((a, b) => a.timestamp - b.timestamp);
 
 		const patterns: Array<{
 			email?: string;
@@ -1071,8 +1133,8 @@ export const detectRapidFirePatterns = zq({
 			lastTimestamp: number;
 		}> = [];
 
-		const emailGroups = new Map<string, typeof operations>();
-		for (const op of operations) {
+		const emailGroups = new Map<string, typeof sortedOps>();
+		for (const op of sortedOps) {
 			if (op.email && op.email !== "audience") {
 				if (!emailGroups.has(op.email)) {
 					emailGroups.set(op.email, []);
@@ -1104,8 +1166,8 @@ export const detectRapidFirePatterns = zq({
 			}
 		}
 
-		const actorGroups = new Map<string, typeof operations>();
-		for (const op of operations) {
+		const actorGroups = new Map<string, typeof sortedOps>();
+		for (const op of sortedOps) {
 			if (op.actorId) {
 				if (!actorGroups.has(op.actorId)) {
 					actorGroups.set(op.actorId, []);
@@ -1143,7 +1205,10 @@ export const detectRapidFirePatterns = zq({
 
 /**
  * Rate limiting: Check if an email can be sent to a recipient
- * Based on recent email operations in the database
+ * Based on recent email operations in the database.
+ *
+ * Uses efficient .take() query - only reads the minimum number of documents
+ * needed to determine if the rate limit is exceeded.
  */
 export const checkRecipientRateLimit = zq({
 	args: z.object({
@@ -1163,15 +1228,17 @@ export const checkRecipientRateLimit = zq({
 	handler: async (ctx, args) => {
 		const cutoffTime = Date.now() - args.timeWindowMs;
 
+		// Use the compound index (email, timestamp) to efficiently query
+		// Only fetch up to maxEmails + 1 to check if limit exceeded
 		const operations = await ctx.db
 			.query("emailOperations")
-			.withIndex("email", (q) => q.eq("email", args.email))
-			.collect();
+			.withIndex("email", (q) =>
+				q.eq("email", args.email).gte("timestamp", cutoffTime),
+			)
+			.take(args.maxEmails + 1);
 
-		const recentOps = operations.filter(
-			(op) => op.timestamp >= cutoffTime && op.success,
-		);
-
+		// Filter for successful operations only
+		const recentOps = operations.filter((op) => op.success);
 		const count = recentOps.length;
 		const allowed = count < args.maxEmails;
 
@@ -1196,7 +1263,10 @@ export const checkRecipientRateLimit = zq({
 
 /**
  * Rate limiting: Check if an actor/user can send more emails
- * Based on recent email operations in the database
+ * Based on recent email operations in the database.
+ *
+ * Uses efficient .take() query - only reads the minimum number of documents
+ * needed to determine if the rate limit is exceeded.
  */
 export const checkActorRateLimit = zq({
 	args: z.object({
@@ -1214,15 +1284,17 @@ export const checkActorRateLimit = zq({
 	handler: async (ctx, args) => {
 		const cutoffTime = Date.now() - args.timeWindowMs;
 
+		// Use the compound index (actorId, timestamp) to efficiently query
+		// Only fetch up to maxEmails + 1 to check if limit exceeded
 		const operations = await ctx.db
 			.query("emailOperations")
-			.withIndex("actorId", (q) => q.eq("actorId", args.actorId))
-			.collect();
+			.withIndex("actorId", (q) =>
+				q.eq("actorId", args.actorId).gte("timestamp", cutoffTime),
+			)
+			.take(args.maxEmails + 1);
 
-		const recentOps = operations.filter(
-			(op) => op.timestamp >= cutoffTime && op.success,
-		);
-
+		// Filter for successful operations only
+		const recentOps = operations.filter((op) => op.success);
 		const count = recentOps.length;
 		const allowed = count < args.maxEmails;
 
@@ -1247,7 +1319,10 @@ export const checkActorRateLimit = zq({
 
 /**
  * Rate limiting: Check global email sending rate
- * Checks total email operations across all senders
+ * Checks total email operations across all senders.
+ *
+ * Uses efficient .take() query - only reads the minimum number of documents
+ * needed to determine if the rate limit is exceeded.
  */
 export const checkGlobalRateLimit = zq({
 	args: z.object({
@@ -1263,11 +1338,14 @@ export const checkGlobalRateLimit = zq({
 	handler: async (ctx, args) => {
 		const cutoffTime = Date.now() - args.timeWindowMs;
 
+		// Use the timestamp index to efficiently query recent operations
+		// Only fetch up to maxEmails + 1 to check if limit exceeded
 		const operations = await ctx.db
 			.query("emailOperations")
 			.withIndex("timestamp", (q) => q.gte("timestamp", cutoffTime))
-			.collect();
+			.take(args.maxEmails + 1);
 
+		// Filter for successful operations only
 		const recentOps = operations.filter((op) => op.success);
 		const count = recentOps.length;
 		const allowed = count < args.maxEmails;
@@ -1277,6 +1355,57 @@ export const checkGlobalRateLimit = zq({
 			count,
 			limit: args.maxEmails,
 			timeWindowMs: args.timeWindowMs,
+		};
+	},
+});
+
+/**
+ * Backfill the contact aggregate with existing contacts.
+ * Run this mutation after upgrading to a version with aggregate support.
+ *
+ * This processes contacts in batches to avoid timeout issues with large datasets.
+ * Call repeatedly with the returned cursor until isDone is true.
+ *
+ * Usage:
+ * 1. First call with clear: true to reset the aggregate
+ * 2. Subsequent calls with the returned cursor until isDone is true
+ */
+export const backfillContactAggregate = zm({
+	args: z.object({
+		cursor: z.string().nullable().optional(),
+		batchSize: z.number().min(1).max(500).default(100),
+		clear: z.boolean().optional(), // Set to true on first call to clear existing aggregate
+	}),
+	returns: z.object({
+		processed: z.number(),
+		cursor: z.string().nullable(),
+		isDone: z.boolean(),
+	}),
+	handler: async (ctx, args) => {
+		// Clear aggregate on first call if requested
+		if (args.clear && !args.cursor) {
+			await aggregateClear(ctx);
+		}
+
+		const paginationOpts = {
+			cursor: args.cursor ?? null,
+			numItems: args.batchSize,
+		};
+
+		const result = await paginator(ctx.db, schema)
+			.query("contacts")
+			.order("asc")
+			.paginate(paginationOpts);
+
+		// Insert each contact into the aggregate
+		for (const contact of result.page) {
+			await aggregateInsert(ctx, contact);
+		}
+
+		return {
+			processed: result.page.length,
+			cursor: result.continueCursor,
+			isDone: result.isDone,
 		};
 	},
 });

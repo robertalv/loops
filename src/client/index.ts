@@ -1,7 +1,7 @@
-import { actionGeneric, queryGeneric } from "convex/server";
+import { actionGeneric, mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
 import type { ComponentApi } from "../component/_generated/component.js";
-import type { RunActionCtx, RunQueryCtx } from "../types";
+import type { RunActionCtx, RunMutationCtx, RunQueryCtx } from "../types";
 
 export type LoopsComponent = ComponentApi;
 
@@ -360,6 +360,39 @@ export class Loops {
 	}
 
 	/**
+	 * Backfill the contact aggregate with existing contacts.
+	 * Run this after upgrading to a version with aggregate support.
+	 *
+	 * This processes contacts in batches to avoid timeout issues with large datasets.
+	 * Call repeatedly with the returned cursor until isDone is true.
+	 *
+	 * Usage:
+	 * ```ts
+	 * // First call - clear existing aggregate and start backfill
+	 * let result = await loops.backfillContactAggregate(ctx, { clear: true });
+	 *
+	 * // Continue until done
+	 * while (!result.isDone) {
+	 *   result = await loops.backfillContactAggregate(ctx, { cursor: result.cursor });
+	 * }
+	 * ```
+	 */
+	async backfillContactAggregate(
+		ctx: RunMutationCtx,
+		options?: {
+			cursor?: string | null;
+			batchSize?: number;
+			clear?: boolean;
+		},
+	) {
+		return ctx.runMutation(this.lib.backfillContactAggregate, {
+			cursor: options?.cursor ?? null,
+			batchSize: options?.batchSize ?? 100,
+			clear: options?.clear,
+		});
+	}
+
+	/**
 	 * For easy re-exporting.
 	 * Apps can do
 	 * ```ts
@@ -562,6 +595,16 @@ export class Loops {
 				},
 				handler: async (ctx, args) => {
 					return await this.checkGlobalRateLimit(ctx, args);
+				},
+			}),
+			backfillContactAggregate: mutationGeneric({
+				args: {
+					cursor: v.optional(v.union(v.string(), v.null())),
+					batchSize: v.optional(v.number()),
+					clear: v.optional(v.boolean()),
+				},
+				handler: async (ctx, args) => {
+					return await this.backfillContactAggregate(ctx, args);
 				},
 			}),
 		};

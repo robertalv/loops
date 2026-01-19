@@ -1,9 +1,11 @@
 {
 	"name": "@devwithbobby/loops",
-	"version": "0.1.20",
+	"version": "0.1.21",
 	"description": "Convex component for integrating with Loops.so email marketing platform",
 	"license": "Apache-2.0",
 	"type": "module",
+	"main": "dist/client/index.js",
+	"types": "dist/client/index.d.ts",
 	"keywords": [
 		"convex",
 		"component",
@@ -32,19 +34,22 @@
 	"exports": {
 		"./package.json": "./package.json",
 		".": {
-			"@convex-dev/component-source": "./src/client/index.ts",
 			"types": "./dist/client/index.d.ts",
 			"default": "./dist/client/index.js"
 		},
 		"./convex.config": {
-			"@convex-dev/component-source": "./src/component/convex.config.ts",
 			"types": "./dist/component/convex.config.d.ts",
-			"default": "./src/component/convex.config.ts"
+			"default": "./dist/component/convex.config.js"
 		},
-		"./component": {
-			"@convex-dev/component-source": "./src/component/_generated/component.ts",
-			"types": "./dist/component/_generated/component.d.ts",
-			"default": "./dist/component/_generated/component.js"
+		"./convex.config.js": {
+			"types": "./dist/component/convex.config.d.ts",
+			"default": "./dist/component/convex.config.js"
+		},
+		"./_generated/component": {
+			"types": "./dist/component/_generated/component.d.ts"
+		},
+		"./_generated/component.js": {
+			"types": "./dist/component/_generated/component.d.ts"
 		},
 		"./test": "./src/test.ts"
 	},
@@ -77,6 +82,7 @@
 		"release": "bun run preversion && npm version patch && npm publish"
 	},
 	"dependencies": {
+		"@convex-dev/aggregate": "^0.2.1",
 		"zod": "^4.1.12",
 		"zodvex": "^0.2.3"
 	},
