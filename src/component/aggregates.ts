@@ -4,6 +4,7 @@ import type { DataModel, Doc } from "./_generated/dataModel";
 import { components } from "./_generated/api";
 
 // Cast components to the expected type for the aggregate library
+// biome-ignore lint/suspicious/noExplicitAny: Component API type mismatch with aggregate library
 const contactAggregateComponent = components.contactAggregate as any;
 
 /**

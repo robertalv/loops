@@ -1,6 +1,6 @@
 {
 	"name": "@devwithbobby/loops",
-	"version": "0.1.21",
+	"version": "0.2.0",
 	"description": "Convex component for integrating with Loops.so email marketing platform",
 	"license": "Apache-2.0",
 	"type": "module",
@@ -70,7 +70,7 @@
 		"check": "biome check .",
 		"check:fix": "biome check --write .",
 		"typecheck": "tsc --noEmit",
-		"attw": "attw $(npm pack -s) --exclude-entrypoints ./convex.config --profile esm-only",
+		"attw": "attw $(npm pack -s) --exclude-entrypoints ./convex.config ./test --profile esm-only --ignore-rules internal-resolution-error",
 		"prepare": "npm run build || true",
 		"changeset": "changeset",
 		"ci:version": "changeset version && bun update",
