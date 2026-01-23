@@ -162,6 +162,7 @@ export const batchCreateResponseValidator = v.object({
 
 /**
  * Find contact response validator
+ * Note: Loops API returns additional fields beyond our contact model
  */
 export const findContactResponseValidator = v.object({
 	success: v.boolean(),
@@ -176,6 +177,11 @@ export const findContactResponseValidator = v.object({
 			userGroup: v.optional(v.union(v.string(), v.null())),
 			userId: v.optional(v.union(v.string(), v.null())),
 			createdAt: v.optional(v.union(v.string(), v.null())),
+			// Additional fields from Loops API
+			audienceId: v.optional(v.union(v.string(), v.null())),
+			timestamp: v.optional(v.union(v.string(), v.null())),
+			dataVariables: v.optional(v.any()),
+			mailingLists: v.optional(v.any()),
 		}),
 	),
 });

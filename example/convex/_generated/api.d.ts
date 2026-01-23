@@ -100,13 +100,17 @@ export declare const components: {
         { apiKey: string; email: string },
         {
           contact?: {
+            audienceId?: string | null;
             createdAt?: string | null;
+            dataVariables?: any;
             email?: string | null;
             firstName?: string | null;
             id?: string | null;
             lastName?: string | null;
+            mailingLists?: any;
             source?: string | null;
             subscribed?: boolean | null;
+            timestamp?: string | null;
             userGroup?: string | null;
             userId?: string | null;
           };
