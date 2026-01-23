@@ -1,24 +1,24 @@
 import { httpRouter } from "convex/server";
-import {
-	type ContactPayload,
-	type DeleteContactPayload,
-	type EventPayload,
-	internalLib,
-	type TransactionalPayload,
-	type TriggerPayload,
-	type UpdateContactPayload,
+import type {
+	ContactPayload,
+	DeleteContactPayload,
+	EventPayload,
+	TransactionalPayload,
+	TriggerPayload,
+	UpdateContactPayload,
 } from "../types";
-import {
-	buildCorsHeaders,
-	jsonResponse,
-	emptyResponse,
-	readJsonBody,
-	respondError,
-	booleanFromQuery,
-	numberFromQuery,
-	requireLoopsApiKey,
-} from "./helpers";
+import { api } from "./_generated/api";
 import { httpAction } from "./_generated/server";
+import {
+	booleanFromQuery,
+	buildCorsHeaders,
+	emptyResponse,
+	jsonResponse,
+	numberFromQuery,
+	readJsonBody,
+	requireLoopsApiKey,
+	respondError,
+} from "./helpers";
 
 const http = httpRouter();
 
@@ -49,7 +49,7 @@ http.route({
 	handler: httpAction(async (ctx, request) => {
 		try {
 			const contact = await readJsonBody<ContactPayload>(request);
-			const data = await ctx.runAction(internalLib.addContact, {
+			const data = await ctx.runAction(api.actions.addContact, {
 				apiKey: requireLoopsApiKey(),
 				contact,
 			});
@@ -69,7 +69,7 @@ http.route({
 			if (!payload.email) {
 				throw new Error("email is required");
 			}
-			const data = await ctx.runAction(internalLib.updateContact, {
+			const data = await ctx.runAction(api.actions.updateContact, {
 				apiKey: requireLoopsApiKey(),
 				email: payload.email,
 				dataVariables: payload.dataVariables,
@@ -95,14 +95,14 @@ http.route({
 			const url = new URL(request.url);
 			const email = url.searchParams.get("email");
 			if (email) {
-				const data = await ctx.runAction(internalLib.findContact, {
+				const data = await ctx.runAction(api.actions.findContact, {
 					apiKey: requireLoopsApiKey(),
 					email,
 				});
 				return jsonResponse(data);
 			}
 
-			const data = await ctx.runQuery(internalLib.listContacts, {
+			const data = await ctx.runQuery(api.queries.listContacts, {
 				userGroup: url.searchParams.get("userGroup") ?? undefined,
 				source: url.searchParams.get("source") ?? undefined,
 				subscribed: booleanFromQuery(url.searchParams.get("subscribed")),
@@ -125,7 +125,7 @@ http.route({
 			if (!payload.email) {
 				throw new Error("email is required");
 			}
-			await ctx.runAction(internalLib.deleteContact, {
+			await ctx.runAction(api.actions.deleteContact, {
 				apiKey: requireLoopsApiKey(),
 				email: payload.email,
 			});
@@ -148,7 +148,7 @@ http.route({
 			if (!payload.email) {
 				throw new Error("email is required");
 			}
-			const data = await ctx.runAction(internalLib.sendTransactional, {
+			const data = await ctx.runAction(api.actions.sendTransactional, {
 				apiKey: requireLoopsApiKey(),
 				transactionalId: payload.transactionalId,
 				email: payload.email,
@@ -173,7 +173,7 @@ http.route({
 			if (!payload.eventName) {
 				throw new Error("eventName is required");
 			}
-			const data = await ctx.runAction(internalLib.sendEvent, {
+			const data = await ctx.runAction(api.actions.sendEvent, {
 				apiKey: requireLoopsApiKey(),
 				email: payload.email,
 				eventName: payload.eventName,
@@ -198,7 +198,7 @@ http.route({
 			if (!payload.email) {
 				throw new Error("email is required");
 			}
-			const data = await ctx.runAction(internalLib.triggerLoop, {
+			const data = await ctx.runAction(api.actions.triggerLoop, {
 				apiKey: requireLoopsApiKey(),
 				loopId: payload.loopId,
 				email: payload.email,
@@ -222,7 +222,7 @@ http.route({
 				url.searchParams.get("timeWindowMs"),
 				86400000,
 			);
-			const data = await ctx.runQuery(internalLib.getEmailStats, {
+			const data = await ctx.runQuery(api.queries.getEmailStats, {
 				timeWindowMs,
 			});
 			return jsonResponse(data);

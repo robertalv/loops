@@ -31,7 +31,9 @@ export class Loops {
 	public readonly options?: {
 		apiKey?: string;
 	};
-	private readonly lib: NonNullable<LoopsComponent["lib"]>;
+	private readonly actions: NonNullable<LoopsComponent["actions"]>;
+	private readonly queries: NonNullable<LoopsComponent["queries"]>;
+	private readonly mutations: NonNullable<LoopsComponent["mutations"]>;
 	private _apiKey?: string;
 
 	constructor(
@@ -48,7 +50,7 @@ export class Loops {
 			);
 		}
 
-		if (!component.lib) {
+		if (!component.actions || !component.queries || !component.mutations) {
 			throw new Error(
 				"Invalid component reference. " +
 					"The component may not be properly mounted. " +
@@ -57,7 +59,9 @@ export class Loops {
 			);
 		}
 
-		this.lib = component.lib;
+		this.actions = component.actions;
+		this.queries = component.queries;
+		this.mutations = component.mutations;
 		this.options = options;
 		this._apiKey = options?.apiKey;
 
@@ -88,7 +92,7 @@ export class Loops {
 	 * Add or update a contact in Loops
 	 */
 	async addContact(ctx: RunActionCtx, contact: ContactData) {
-		return ctx.runAction(this.lib.addContact, {
+		return ctx.runAction(this.actions.addContact, {
 			apiKey: this.apiKey,
 			contact,
 		});
@@ -104,7 +108,7 @@ export class Loops {
 			dataVariables?: Record<string, unknown>;
 		},
 	) {
-		return ctx.runAction(this.lib.updateContact, {
+		return ctx.runAction(this.actions.updateContact, {
 			apiKey: this.apiKey,
 			email,
 			...updates,
@@ -118,7 +122,7 @@ export class Loops {
 		ctx: RunActionCtx,
 		options: TransactionalEmailOptions,
 	) {
-		return ctx.runAction(this.lib.sendTransactional, {
+		return ctx.runAction(this.actions.sendTransactional, {
 			apiKey: this.apiKey,
 			...options,
 		});
@@ -128,7 +132,7 @@ export class Loops {
 	 * Send an event to Loops to trigger email workflows
 	 */
 	async sendEvent(ctx: RunActionCtx, options: EventOptions) {
-		return ctx.runAction(this.lib.sendEvent, {
+		return ctx.runAction(this.actions.sendEvent, {
 			apiKey: this.apiKey,
 			...options,
 		});
@@ -139,7 +143,7 @@ export class Loops {
 	 * Retrieves contact information from Loops
 	 */
 	async findContact(ctx: RunActionCtx, email: string) {
-		return ctx.runAction(this.lib.findContact, {
+		return ctx.runAction(this.actions.findContact, {
 			apiKey: this.apiKey,
 			email,
 		});
@@ -150,7 +154,7 @@ export class Loops {
 	 * Create multiple contacts in a single API call
 	 */
 	async batchCreateContacts(ctx: RunActionCtx, contacts: ContactData[]) {
-		return ctx.runAction(this.lib.batchCreateContacts, {
+		return ctx.runAction(this.actions.batchCreateContacts, {
 			apiKey: this.apiKey,
 			contacts,
 		});
@@ -161,7 +165,7 @@ export class Loops {
 	 * Unsubscribes a contact from receiving emails (they remain in the system)
 	 */
 	async unsubscribeContact(ctx: RunActionCtx, email: string) {
-		return ctx.runAction(this.lib.unsubscribeContact, {
+		return ctx.runAction(this.actions.unsubscribeContact, {
 			apiKey: this.apiKey,
 			email,
 		});
@@ -172,7 +176,7 @@ export class Loops {
 	 * Resubscribes a previously unsubscribed contact
 	 */
 	async resubscribeContact(ctx: RunActionCtx, email: string) {
-		return ctx.runAction(this.lib.resubscribeContact, {
+		return ctx.runAction(this.actions.resubscribeContact, {
 			apiKey: this.apiKey,
 			email,
 		});
@@ -191,7 +195,7 @@ export class Loops {
 			subscribed?: boolean;
 		},
 	) {
-		return ctx.runQuery(this.lib.countContacts, options ?? {});
+		return ctx.runQuery(this.queries.countContacts, options ?? {});
 	}
 
 	/**
@@ -212,7 +216,7 @@ export class Loops {
 			cursor?: string | null;
 		},
 	) {
-		return ctx.runQuery(this.lib.listContacts, {
+		return ctx.runQuery(this.queries.listContacts, {
 			userGroup: options?.userGroup,
 			source: options?.source,
 			subscribed: options?.subscribed,
@@ -231,7 +235,7 @@ export class Loops {
 			maxEmailsPerRecipient?: number;
 		},
 	) {
-		return ctx.runQuery(this.lib.detectRecipientSpam, {
+		return ctx.runQuery(this.queries.detectRecipientSpam, {
 			timeWindowMs: options?.timeWindowMs ?? 3600000,
 			maxEmailsPerRecipient: options?.maxEmailsPerRecipient ?? 10,
 		});
@@ -247,7 +251,7 @@ export class Loops {
 			maxEmailsPerActor?: number;
 		},
 	) {
-		return ctx.runQuery(this.lib.detectActorSpam, {
+		return ctx.runQuery(this.queries.detectActorSpam, {
 			timeWindowMs: options?.timeWindowMs ?? 3600000,
 			maxEmailsPerActor: options?.maxEmailsPerActor ?? 100,
 		});
@@ -262,7 +266,7 @@ export class Loops {
 			timeWindowMs?: number;
 		},
 	) {
-		return ctx.runQuery(this.lib.getEmailStats, {
+		return ctx.runQuery(this.queries.getEmailStats, {
 			timeWindowMs: options?.timeWindowMs ?? 86400000,
 		});
 	}
@@ -277,7 +281,7 @@ export class Loops {
 			minEmailsInWindow?: number;
 		},
 	) {
-		return ctx.runQuery(this.lib.detectRapidFirePatterns, {
+		return ctx.runQuery(this.queries.detectRapidFirePatterns, {
 			timeWindowMs: options?.timeWindowMs ?? 60000,
 			minEmailsInWindow: options?.minEmailsInWindow ?? 5,
 		});
@@ -294,7 +298,7 @@ export class Loops {
 			maxEmails: number;
 		},
 	) {
-		return ctx.runQuery(this.lib.checkRecipientRateLimit, options);
+		return ctx.runQuery(this.queries.checkRecipientRateLimit, options);
 	}
 
 	/**
@@ -308,7 +312,7 @@ export class Loops {
 			maxEmails: number;
 		},
 	) {
-		return ctx.runQuery(this.lib.checkActorRateLimit, options);
+		return ctx.runQuery(this.queries.checkActorRateLimit, options);
 	}
 
 	/**
@@ -321,14 +325,14 @@ export class Loops {
 			maxEmails: number;
 		},
 	) {
-		return ctx.runQuery(this.lib.checkGlobalRateLimit, options);
+		return ctx.runQuery(this.queries.checkGlobalRateLimit, options);
 	}
 
 	/**
 	 * Delete a contact from Loops
 	 */
 	async deleteContact(ctx: RunActionCtx, email: string) {
-		return ctx.runAction(this.lib.deleteContact, {
+		return ctx.runAction(this.actions.deleteContact, {
 			apiKey: this.apiKey,
 			email,
 		});
@@ -353,7 +357,7 @@ export class Loops {
 			eventName?: string; // Event name that triggers the loop
 		},
 	) {
-		return ctx.runAction(this.lib.triggerLoop, {
+		return ctx.runAction(this.actions.triggerLoop, {
 			apiKey: this.apiKey,
 			...options,
 		});
@@ -385,7 +389,7 @@ export class Loops {
 			clear?: boolean;
 		},
 	) {
-		return ctx.runMutation(this.lib.backfillContactAggregate, {
+		return ctx.runMutation(this.mutations.backfillContactAggregate, {
 			cursor: options?.cursor ?? null,
 			batchSize: options?.batchSize ?? 100,
 			clear: options?.clear,

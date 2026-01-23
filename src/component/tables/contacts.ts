@@ -1,15 +1,17 @@
-import { z } from "zod";
-import { zodTable } from "zodvex";
+import { v } from "convex/values";
 
-export const Contacts = zodTable("contacts", {
-	email: z.string().email(),
-	firstName: z.string().optional(),
-	lastName: z.string().optional(),
-	userId: z.string().optional(),
-	source: z.string().optional(),
-	subscribed: z.boolean().default(true),
-	userGroup: z.string().optional(),
-	loopsContactId: z.string().optional(),
-	createdAt: z.number(),
-	updatedAt: z.number(),
-});
+/**
+ * Contacts table field definitions
+ */
+export const contactsFields = {
+	email: v.string(),
+	firstName: v.optional(v.string()),
+	lastName: v.optional(v.string()),
+	userId: v.optional(v.string()),
+	source: v.optional(v.string()),
+	subscribed: v.optional(v.boolean()),
+	userGroup: v.optional(v.string()),
+	loopsContactId: v.optional(v.string()),
+	createdAt: v.number(),
+	updatedAt: v.number(),
+};

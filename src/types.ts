@@ -4,7 +4,6 @@ import type {
 	GenericMutationCtx,
 	GenericQueryCtx,
 } from "convex/server";
-import { api } from "./component/_generated/api";
 
 // Convenient types for `ctx` args, that only include the bare minimum.
 export type RunQueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
@@ -60,7 +59,3 @@ export interface TriggerPayload {
 	dataVariables?: Record<string, unknown>;
 	eventName?: string;
 }
-
-// Lib reference for component internals
-// This is used internally by the component to call its own functions
-export const internalLib = api.lib;

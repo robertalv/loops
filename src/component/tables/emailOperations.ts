@@ -1,16 +1,23 @@
-import { z } from "zod";
-import { zodTable } from "zodvex";
+import { v } from "convex/values";
 
-export const EmailOperations = zodTable("emailOperations", {
-	operationType: z.enum(["transactional", "event", "campaign", "loop"]),
-	email: z.string().email(),
-	actorId: z.string().optional(),
-	transactionalId: z.string().optional(),
-	campaignId: z.string().optional(),
-	loopId: z.string().optional(),
-	eventName: z.string().optional(),
-	timestamp: z.number(),
-	success: z.boolean(),
-	messageId: z.string().optional(),
-	metadata: z.optional(z.record(z.string(), z.any())),
-});
+/**
+ * Email operations table field definitions
+ */
+export const emailOperationsFields = {
+	operationType: v.union(
+		v.literal("transactional"),
+		v.literal("event"),
+		v.literal("campaign"),
+		v.literal("loop"),
+	),
+	email: v.string(),
+	actorId: v.optional(v.string()),
+	transactionalId: v.optional(v.string()),
+	campaignId: v.optional(v.string()),
+	loopId: v.optional(v.string()),
+	eventName: v.optional(v.string()),
+	timestamp: v.number(),
+	success: v.boolean(),
+	messageId: v.optional(v.string()),
+	metadata: v.optional(v.record(v.string(), v.any())),
+};

@@ -23,7 +23,7 @@ import type { FunctionReference } from "convex/server";
  */
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
-    lib: {
+    actions: {
       addContact: FunctionReference<
         "action",
         "internal",
@@ -40,13 +40,6 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           };
         },
         { id?: string; success: boolean },
-        Name
-      >;
-      backfillContactAggregate: FunctionReference<
-        "mutation",
-        "internal",
-        { batchSize?: number; clear?: boolean; cursor?: string | null },
-        { cursor: string | null; isDone: boolean; processed: number },
         Name
       >;
       batchCreateContacts: FunctionReference<
@@ -72,6 +65,112 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         },
         Name
       >;
+      deleteContact: FunctionReference<
+        "action",
+        "internal",
+        { apiKey: string; email: string },
+        { success: boolean },
+        Name
+      >;
+      findContact: FunctionReference<
+        "action",
+        "internal",
+        { apiKey: string; email: string },
+        {
+          contact?: {
+            createdAt?: string | null;
+            email?: string | null;
+            firstName?: string | null;
+            id?: string | null;
+            lastName?: string | null;
+            source?: string | null;
+            subscribed?: boolean | null;
+            userGroup?: string | null;
+            userId?: string | null;
+          };
+          success: boolean;
+        },
+        Name
+      >;
+      resubscribeContact: FunctionReference<
+        "action",
+        "internal",
+        { apiKey: string; email: string },
+        { success: boolean },
+        Name
+      >;
+      sendEvent: FunctionReference<
+        "action",
+        "internal",
+        {
+          apiKey: string;
+          email: string;
+          eventName: string;
+          eventProperties?: Record<string, any>;
+        },
+        { success: boolean },
+        Name
+      >;
+      sendTransactional: FunctionReference<
+        "action",
+        "internal",
+        {
+          apiKey: string;
+          dataVariables?: Record<string, any>;
+          email: string;
+          transactionalId: string;
+        },
+        { messageId?: string; success: boolean },
+        Name
+      >;
+      triggerLoop: FunctionReference<
+        "action",
+        "internal",
+        {
+          apiKey: string;
+          dataVariables?: Record<string, any>;
+          email: string;
+          eventName?: string;
+          loopId: string;
+        },
+        { success: boolean; warning?: string },
+        Name
+      >;
+      unsubscribeContact: FunctionReference<
+        "action",
+        "internal",
+        { apiKey: string; email: string },
+        { success: boolean },
+        Name
+      >;
+      updateContact: FunctionReference<
+        "action",
+        "internal",
+        {
+          apiKey: string;
+          dataVariables?: Record<string, any>;
+          email: string;
+          firstName?: string;
+          lastName?: string;
+          source?: string;
+          subscribed?: boolean;
+          userGroup?: string;
+          userId?: string;
+        },
+        { success: boolean },
+        Name
+      >;
+    };
+    mutations: {
+      backfillContactAggregate: FunctionReference<
+        "mutation",
+        "internal",
+        { batchSize?: number; clear?: boolean; cursor?: string | null },
+        { cursor: string | null; isDone: boolean; processed: number },
+        Name
+      >;
+    };
+    queries: {
       checkActorRateLimit: FunctionReference<
         "query",
         "internal",
@@ -117,13 +216,6 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         number,
         Name
       >;
-      deleteContact: FunctionReference<
-        "action",
-        "internal",
-        { apiKey: string; email: string },
-        { success: boolean },
-        Name
-      >;
       detectActorSpam: FunctionReference<
         "query",
         "internal",
@@ -150,26 +242,6 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "internal",
         { maxEmailsPerRecipient?: number; timeWindowMs?: number },
         Array<{ count: number; email: string; timeWindowMs: number }>,
-        Name
-      >;
-      findContact: FunctionReference<
-        "action",
-        "internal",
-        { apiKey: string; email: string },
-        {
-          contact?: {
-            createdAt?: string | null;
-            email?: string | null;
-            firstName?: string | null;
-            id?: string | null;
-            lastName?: string | null;
-            source?: string | null;
-            subscribed?: boolean | null;
-            userGroup?: string | null;
-            userId?: string | null;
-          };
-          success: boolean;
-        },
         Name
       >;
       getEmailStats: FunctionReference<
@@ -213,115 +285,6 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           continueCursor: string | null;
           isDone: boolean;
         },
-        Name
-      >;
-      logEmailOperation: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          actorId?: string;
-          campaignId?: string;
-          email: string;
-          eventName?: string;
-          loopId?: string;
-          messageId?: string;
-          metadata?: Record<string, any>;
-          operationType: "transactional" | "event" | "campaign" | "loop";
-          success: boolean;
-          transactionalId?: string;
-        },
-        any,
-        Name
-      >;
-      removeContact: FunctionReference<
-        "mutation",
-        "internal",
-        { email: string },
-        any,
-        Name
-      >;
-      resubscribeContact: FunctionReference<
-        "action",
-        "internal",
-        { apiKey: string; email: string },
-        { success: boolean },
-        Name
-      >;
-      sendEvent: FunctionReference<
-        "action",
-        "internal",
-        {
-          apiKey: string;
-          email: string;
-          eventName: string;
-          eventProperties?: Record<string, any>;
-        },
-        { success: boolean },
-        Name
-      >;
-      sendTransactional: FunctionReference<
-        "action",
-        "internal",
-        {
-          apiKey: string;
-          dataVariables?: Record<string, any>;
-          email: string;
-          transactionalId: string;
-        },
-        { messageId?: string; success: boolean },
-        Name
-      >;
-      storeContact: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          email: string;
-          firstName?: string;
-          lastName?: string;
-          loopsContactId?: string;
-          source?: string;
-          subscribed?: boolean;
-          userGroup?: string;
-          userId?: string;
-        },
-        any,
-        Name
-      >;
-      triggerLoop: FunctionReference<
-        "action",
-        "internal",
-        {
-          apiKey: string;
-          dataVariables?: Record<string, any>;
-          email: string;
-          eventName?: string;
-          loopId: string;
-        },
-        { success: boolean; warning?: string },
-        Name
-      >;
-      unsubscribeContact: FunctionReference<
-        "action",
-        "internal",
-        { apiKey: string; email: string },
-        { success: boolean },
-        Name
-      >;
-      updateContact: FunctionReference<
-        "action",
-        "internal",
-        {
-          apiKey: string;
-          dataVariables?: Record<string, any>;
-          email: string;
-          firstName?: string;
-          lastName?: string;
-          source?: string;
-          subscribed?: boolean;
-          userGroup?: string;
-          userId?: string;
-        },
-        { success: boolean },
         Name
       >;
     };

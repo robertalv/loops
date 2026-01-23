@@ -82,9 +82,7 @@
 		"release": "bun run preversion && npm version patch && npm publish"
 	},
 	"dependencies": {
-		"@convex-dev/aggregate": "^0.2.1",
-		"zod": "^4.1.12",
-		"zodvex": "^0.2.3"
+		"@convex-dev/aggregate": "^0.2.1"
 	},
 	"peerDependencies": {
 		"convex": "^1.0.0"

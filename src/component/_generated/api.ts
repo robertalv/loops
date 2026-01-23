@@ -8,10 +8,12 @@
  * @module
  */
 
+import type * as actions from "../actions.js";
 import type * as aggregates from "../aggregates.js";
 import type * as helpers from "../helpers.js";
 import type * as http from "../http.js";
-import type * as lib from "../lib.js";
+import type * as mutations from "../mutations.js";
+import type * as queries from "../queries.js";
 import type * as tables_contacts from "../tables/contacts.js";
 import type * as tables_emailOperations from "../tables/emailOperations.js";
 import type * as validators from "../validators.js";
@@ -24,10 +26,12 @@ import type {
 import { anyApi, componentsGeneric } from "convex/server";
 
 const fullApi: ApiFromModules<{
+  actions: typeof actions;
   aggregates: typeof aggregates;
   helpers: typeof helpers;
   http: typeof http;
-  lib: typeof lib;
+  mutations: typeof mutations;
+  queries: typeof queries;
   "tables/contacts": typeof tables_contacts;
   "tables/emailOperations": typeof tables_emailOperations;
   validators: typeof validators;
