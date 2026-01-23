@@ -488,6 +488,7 @@ export const batchCreateContacts = action({
 /**
  * Unsubscribe a contact
  * Unsubscribes a contact from receiving emails (they remain in the system)
+ * Uses the update endpoint with subscribed: false as per Loops API
  */
 export const unsubscribeContact = action({
 	args: {
@@ -496,9 +497,9 @@ export const unsubscribeContact = action({
 	},
 	returns: successResponseValidator,
 	handler: async (ctx, args) => {
-		const response = await loopsFetch(args.apiKey, "/contacts/unsubscribe", {
-			method: "POST",
-			json: { email: args.email },
+		const response = await loopsFetch(args.apiKey, "/contacts/update", {
+			method: "PUT",
+			json: { email: args.email, subscribed: false },
 		});
 
 		if (!response.ok) {
@@ -519,6 +520,7 @@ export const unsubscribeContact = action({
 /**
  * Resubscribe a contact
  * Resubscribes a previously unsubscribed contact
+ * Uses the update endpoint with subscribed: true as per Loops API
  */
 export const resubscribeContact = action({
 	args: {
@@ -527,9 +529,9 @@ export const resubscribeContact = action({
 	},
 	returns: successResponseValidator,
 	handler: async (ctx, args) => {
-		const response = await loopsFetch(args.apiKey, "/contacts/resubscribe", {
-			method: "POST",
-			json: { email: args.email },
+		const response = await loopsFetch(args.apiKey, "/contacts/update", {
+			method: "PUT",
+			json: { email: args.email, subscribed: true },
 		});
 
 		if (!response.ok) {

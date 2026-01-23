@@ -6,8 +6,6 @@
       "name": "@devwithbobby/loops",
       "dependencies": {
         "@convex-dev/aggregate": "^0.2.1",
-        "zod": "^4.1.12",
-        "zodvex": "^0.2.3",
       },
       "devDependencies": {
         "@arethetypeswrong/cli": "^0.18.2",
@@ -968,8 +966,6 @@
     "zod": ["zod@4.1.13", "", {}, "sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig=="],
 
     "zod-package-json": ["zod-package-json@1.2.0", "", { "dependencies": { "zod": "^3.25.64" } }, "sha512-tamtgPM3MkP+obfO2dLr/G+nYoYkpJKmuHdYEy6IXRKfLybruoJ5NUj0lM0LxwOpC9PpoGLbll1ecoeyj43Wsg=="],
-
-    "zodvex": ["zodvex@0.2.5", "", { "peerDependencies": { "convex": "^1.28.0", "convex-helpers": "^0.1.104", "zod": "^4.1.12" } }, "sha512-MFvYZynTTbkC+cibk6RyHLUS64FaAvT17N5rvF7NbZrO4tshfqtYED8PD2NJ7krvFwA/tFuJ0Sx+zB1ij/XWqg=="],
 
     "@actions/http-client/undici": ["undici@5.29.0", "", { "dependencies": { "@fastify/busboy": "^2.0.0" } }, "sha512-raqeBD6NQK4SkWhQzeYKd1KmIG6dllBOTt55Rmkt4HtI9mwdWtJljnrXjAFUBLTSN67HWrOIZ3EPF4kjUw80Bg=="],
 
