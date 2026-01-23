@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { api } from "../../src/component/_generated/api";
-import { internalLib } from "../../src/types";
+import { api, internal } from "../../src/component/_generated/api";
 import { mockContactCreate, resetMocks, setupMockFetch } from "./mock-setup";
 import { convexTest } from "./setup.test";
 
@@ -21,7 +20,7 @@ describe("component lib", () => {
 
 	test("addContact stores contact in database", async () => {
 		const t = convexTest();
-		const result = await t.action(api.lib.addContact, {
+		const result = await t.action(api.actions.addContact, {
 			apiKey: "test-api-key",
 			contact: {
 				email: "test@example.com",
@@ -34,13 +33,13 @@ describe("component lib", () => {
 		expect(result.id).toBeDefined();
 
 		// Verify contact was stored by checking count
-		const count = await t.query(api.lib.countContacts, {});
+		const count = await t.query(api.queries.countContacts, {});
 		expect(count).toBeGreaterThanOrEqual(1);
 	});
 
 	test("updateContact updates existing contact", async () => {
 		const t = convexTest();
-		await t.action(api.lib.addContact, {
+		await t.action(api.actions.addContact, {
 			apiKey: "test-api-key",
 			contact: {
 				email: "update@example.com",
@@ -48,7 +47,7 @@ describe("component lib", () => {
 			},
 		});
 
-		const result = await t.action(api.lib.updateContact, {
+		const result = await t.action(api.actions.updateContact, {
 			apiKey: "test-api-key",
 			email: "update@example.com",
 			firstName: "Updated",
@@ -57,7 +56,7 @@ describe("component lib", () => {
 		expect(result.success).toBe(true);
 
 		// Verify update by checking the contact
-		const findResult = await t.action(api.lib.findContact, {
+		const findResult = await t.action(api.actions.findContact, {
 			apiKey: "test-api-key",
 			email: "update@example.com",
 		});
@@ -67,17 +66,17 @@ describe("component lib", () => {
 	test("deleteContact removes contact from database", async () => {
 		const t = convexTest();
 
-		await t.action(api.lib.addContact, {
+		await t.action(api.actions.addContact, {
 			apiKey: "test-api-key",
 			contact: {
 				email: "delete@example.com",
 			},
 		});
 
-		const initialCount = await t.query(api.lib.countContacts, {});
+		const initialCount = await t.query(api.queries.countContacts, {});
 		expect(initialCount).toBeGreaterThanOrEqual(1);
 
-		const result = await t.action(api.lib.deleteContact, {
+		const result = await t.action(api.actions.deleteContact, {
 			apiKey: "test-api-key",
 			email: "delete@example.com",
 		});
@@ -91,19 +90,19 @@ describe("component lib", () => {
 	test("countContacts returns correct count", async () => {
 		const t = convexTest();
 
-		await t.action(api.lib.addContact, {
+		await t.action(api.actions.addContact, {
 			apiKey: "test-api-key",
 			contact: {
 				email: "count1@example.com",
 			},
 		});
-		await t.action(api.lib.addContact, {
+		await t.action(api.actions.addContact, {
 			apiKey: "test-api-key",
 			contact: {
 				email: "count2@example.com",
 			},
 		});
-		await t.action(api.lib.addContact, {
+		await t.action(api.actions.addContact, {
 			apiKey: "test-api-key",
 			contact: {
 				email: "count3@example.com",
@@ -111,15 +110,15 @@ describe("component lib", () => {
 			},
 		});
 
-		const totalCount = await t.query(api.lib.countContacts, {});
+		const totalCount = await t.query(api.queries.countContacts, {});
 		expect(totalCount).toBe(3);
 
-		const premiumCount = await t.query(api.lib.countContacts, {
+		const premiumCount = await t.query(api.queries.countContacts, {
 			userGroup: "premium",
 		});
 		expect(premiumCount).toBe(1);
 
-		const subscribedCount = await t.query(api.lib.countContacts, {
+		const subscribedCount = await t.query(api.queries.countContacts, {
 			subscribed: true,
 		});
 		expect(subscribedCount).toBe(3);
@@ -129,19 +128,19 @@ describe("component lib", () => {
 		const t = convexTest();
 
 		// Wait a bit to ensure different timestamps
-		await t.mutation(internalLib.logEmailOperation, {
+		await t.mutation(internal.mutations.logEmailOperation, {
 			operationType: "transactional",
 			email: "ratelimit@example.com",
 			success: true,
 		});
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		await t.mutation(internalLib.logEmailOperation, {
+		await t.mutation(internal.mutations.logEmailOperation, {
 			operationType: "transactional",
 			email: "ratelimit@example.com",
 			success: true,
 		});
 
-		const check = await t.query(api.lib.checkRecipientRateLimit, {
+		const check = await t.query(api.queries.checkRecipientRateLimit, {
 			email: "ratelimit@example.com",
 			timeWindowMs: 3600000,
 			maxEmails: 10,
@@ -156,7 +155,7 @@ describe("component lib", () => {
 		const t = convexTest();
 
 		for (let i = 0; i < 12; i++) {
-			await t.mutation(internalLib.logEmailOperation, {
+			await t.mutation(internal.mutations.logEmailOperation, {
 				operationType: "transactional",
 				email: "exceeded@example.com",
 				success: true,
@@ -167,7 +166,7 @@ describe("component lib", () => {
 			}
 		}
 
-		const check = await t.query(api.lib.checkRecipientRateLimit, {
+		const check = await t.query(api.queries.checkRecipientRateLimit, {
 			email: "exceeded@example.com",
 			timeWindowMs: 3600000,
 			maxEmails: 10,
@@ -181,26 +180,26 @@ describe("component lib", () => {
 	test("getEmailStats returns correct statistics", async () => {
 		const t = convexTest();
 
-		await t.mutation(internalLib.logEmailOperation, {
+		await t.mutation(internal.mutations.logEmailOperation, {
 			operationType: "transactional",
 			email: "stats1@example.com",
 			success: true,
 		});
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		await t.mutation(internalLib.logEmailOperation, {
+		await t.mutation(internal.mutations.logEmailOperation, {
 			operationType: "event",
 			email: "stats2@example.com",
 			eventName: "test-event",
 			success: true,
 		});
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		await t.mutation(internalLib.logEmailOperation, {
+		await t.mutation(internal.mutations.logEmailOperation, {
 			operationType: "transactional",
 			email: "stats3@example.com",
 			success: false,
 		});
 
-		const stats = await t.query(api.lib.getEmailStats, {
+		const stats = await t.query(api.queries.getEmailStats, {
 			timeWindowMs: 3600000,
 		});
 
@@ -216,7 +215,7 @@ describe("component lib", () => {
 		const t = convexTest();
 
 		for (let i = 0; i < 15; i++) {
-			await t.mutation(internalLib.logEmailOperation, {
+			await t.mutation(internal.mutations.logEmailOperation, {
 				operationType: "transactional",
 				email: "spam@example.com",
 				success: true,
@@ -227,7 +226,7 @@ describe("component lib", () => {
 			}
 		}
 
-		const spam = await t.query(api.lib.detectRecipientSpam, {
+		const spam = await t.query(api.queries.detectRecipientSpam, {
 			timeWindowMs: 3600000,
 			maxEmailsPerRecipient: 10,
 		});
